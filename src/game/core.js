@@ -234,7 +234,9 @@ function newGame(trialMonths = 0, mode = 'battle') {
     }
   }
 
-  for (let i = 0; i < 26; i++) spawnChip(g, pick(wIds), 1);
+  /* 初始芯片：按武器数量自适应，保证每种至少 ~2 个 */
+  const chipCount = Math.max(26, Object.keys(WEAPONS).length * 2);
+  for (let i = 0; i < chipCount; i++) spawnChip(g, pick(wIds), 1);
   for (let i = 0; i < 16; i++) spawnItem(g);
   for (let i = 0; i < 6; i++) spawnTech(g, pickTechId());
   return g;
@@ -1298,8 +1300,22 @@ export function update(dt) {
   if (G.zone.phase < 3) {
     G.chipT -= dt;
     if (G.chipT <= 0) {
-      G.chipT = 15;
-      if (G.pickups.filter(p => p.type === 'chip').length < 14) spawnChip(G, pick(Object.keys(WEAPONS)), Math.random() < .25 ? 2 : 1);
+      G.chipT = 10;
+      /* 智能芯片掉落：偏向玩家当前武器（40% 概率），其余随机 */
+      if (G.pickups.filter(p => p.type === 'chip').length < 22) {
+        const pl = G.player;
+        let chipId;
+        if (pl && pl.alive && !pl.weapon.leg && pl.weapon.lvl < 5 && Math.random() < .40) {
+          chipId = pl.weapon.id;   /* 40% 掉玩家武器的芯片，帮升满级 */
+        } else {
+          chipId = pick(Object.keys(WEAPONS));
+        }
+        spawnChip(G, chipId, Math.random() < .25 ? 2 : 1);
+        /* 额外多掉一个，加速升级节奏 */
+        if (pl && pl.alive && !pl.weapon.leg && pl.weapon.lvl < 5 && Math.random() < .30) {
+          spawnChip(G, pl.weapon.id, 1);
+        }
+      }
     }
     G.itemT -= dt;
     if (G.itemT <= 0) {
