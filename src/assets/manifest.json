@@ -1,0 +1,106 @@
+{
+  "game": "牛马大逃杀",
+  "palette": {
+    "outline": "#14161d",
+    "paper": "#f2efe6",
+    "badge_yellow": "#ffcf33",
+    "layoff_red": "#ff4f4f",
+    "skin": "#e8b98a",
+    "skin_shadow": "#c98f5e",
+    "hair": "#3a3430",
+    "horn": "#d8c9a3",
+    "desk_gray": "#454e63",
+    "screen_cyan": "#38b6d9",
+    "plant_green": "#3f9f66",
+    "plant_light": "#67c98b",
+    "purple": "#b665ff",
+    "shirt_runtime": "#ff00ff"
+  },
+  "worker_sheet": {
+    "file": "worker_sheet.png",
+    "frame_width": 16,
+    "frame_height": 20,
+    "frame_count": 5,
+    "total_size": [
+      80,
+      20
+    ]
+  },
+  "boss_sheet": {
+    "file": "boss_sheet.png",
+    "frame_width": 24,
+    "frame_height": 28,
+    "frame_count": 2,
+    "total_size": [
+      48,
+      28
+    ]
+  },
+  "props": {
+    "file": "props.png",
+    "total_size": [
+      48,
+      12
+    ],
+    "layout": "horizontal strip, 2px fully transparent spacing between icons; icons are bottom-aligned",
+    "icons": [
+      {
+        "name": "chip",
+        "width": 10,
+        "height": 10,
+        "x_offset": 0,
+        "y_offset": 2
+      },
+      {
+        "name": "floppy_disk",
+        "width": 10,
+        "height": 10,
+        "x_offset": 12,
+        "y_offset": 2
+      },
+      {
+        "name": "coffee_cup",
+        "width": 10,
+        "height": 12,
+        "x_offset": 24,
+        "y_offset": 0
+      },
+      {
+        "name": "big_flatbread",
+        "width": 12,
+        "height": 12,
+        "x_offset": 36,
+        "y_offset": 0
+      }
+    ]
+  },
+  "previews": [
+    {
+      "file": "preview_worker.png",
+      "source": "worker_sheet.png",
+      "scale": 8,
+      "total_size": [
+        640,
+        160
+      ]
+    },
+    {
+      "file": "preview_boss.png",
+      "source": "boss_sheet.png",
+      "scale": 8,
+      "total_size": [
+        384,
+        224
+      ]
+    },
+    {
+      "file": "preview_props.png",
+      "source": "props.png",
+      "scale": 8,
+      "total_size": [
+        384,
+        96
+      ]
+    }
+  ]
+}

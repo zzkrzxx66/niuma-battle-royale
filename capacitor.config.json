@@ -1,0 +1,13 @@
+{
+  "appId": "com.niuma.battleroyale",
+  "appName": "牛马大逃杀",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": false,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false
+  }
+}
