@@ -921,6 +921,58 @@ function useItem(u, id) {
         addFloat(u.x, u.y - 16, `简历已刷新（重抽机会 ×${G.rerollCredits}）`, '#7ac8ff', 8, 1);
       }
       break;
+    /* ===== v2.0 新增道具 ===== */
+    case 'triple_coffee':
+      u.hp = Math.min(maxHp(u), u.hp + F(60));
+      if (u.isPlayer) addFloat(u.x, u.y - 16, `三倍浓缩 +${F(60)} HP`, '#7ee08a', 8, .8);
+      break;
+    case 'energy_drink':
+      u.buffs.spdT = 8 * boost; u.buffs.spdM = Math.max(u.buffs.spdM, 1.8);
+      u.buffs.fireT = Math.max(u.buffs.fireT, 8 * boost); u.buffs.fireM = Math.max(u.buffs.fireM, 1.2);
+      if (u.isPlayer) addFloat(u.x, u.y - 16, '魔爪能量！移速+射速拉满', '#6aa3ff', 9, 1);
+      break;
+    case 'golden_parachute':
+      u.hp = maxHp(u);
+      u.invulnT = Math.max(u.invulnT, 10 * boost);
+      if (u.isPlayer) addFloat(u.x, u.y - 16, '金色降落伞！满血+无敌', '#ffcf33', 10, 1.3);
+      break;
+    case 'stock_vest':
+      u.shield = F(100); u.shieldT = 15;
+      u.hp = Math.min(maxHp(u), u.hp + F(30));
+      if (u.isPlayer) addFloat(u.x, u.y - 16, `限股包：+${F(100)}盾 +${F(30)} HP`, '#c9a227', 9, 1);
+      break;
+    case 'promote_letter':
+      gainXp(u, F(100));
+      u.level++; u.xp = 0;
+      if (u.isPlayer) { addFloat(u.x, u.y - 16, '晋升！+100经验+1级', '#ffe27a', 10, 1.2); SFX.levelup(); }
+      break;
+    case 'overtime_4x':
+      u.buffs.fireT = Math.max(u.buffs.fireT, 10 * boost); u.buffs.fireM = Math.max(u.buffs.fireM, 2);
+      u.buffs.dmgT = Math.max(u.buffs.dmgT, 10 * boost); u.buffs.dmgM = Math.max(u.buffs.dmgM, 1.5);
+      if (u.isPlayer) addFloat(u.x, u.y - 16, '四倍加班费！伤害射速双拉', '#ff4f4f', 10, 1.2);
+      break;
+    case 'refresh_token':
+      u.weapon.cd = 0; u.activeCd = 0; u.dashT = 0;
+      u.weapon.droneCds = [0, 0, 0, 0]; u.ragCds = [0, 0]; u.weapon.pillarT = 0;
+      for (const sid in u.subs) u.subs[sid].t = 0;
+      u.buffs.fireT = Math.max(u.buffs.fireT, 5); u.buffs.fireM = Math.max(u.buffs.fireM, 99);
+      if (u.isPlayer) addFloat(u.x, u.y - 16, 'Token刷新！全CD清零', '#67c98b', 9, 1);
+      break;
+    case 'hr_blessing':
+      u.hp = Math.min(maxHp(u), u.hp + F(maxHp(u) * .5));
+      gainXp(u, F(50));
+      if (u.isPlayer) { G.rerollCredits = (G.rerollCredits || 0) + 1; addFloat(u.x, u.y - 16, 'HR祝福！回血+经验+重抽', '#ff9edb', 10, 1.3); }
+      break;
+    case 'team_hotpot':
+      u.buffs.fireT = Math.max(u.buffs.fireT, 15 * boost); u.buffs.fireM = Math.max(u.buffs.fireM, 1.5);
+      u.buffs.spdT = Math.max(u.buffs.spdT, 15 * boost); u.buffs.spdM = Math.max(u.buffs.spdM, 1.3);
+      if (u.isPlayer) addFloat(u.x, u.y - 16, '团建火锅！士气拉满', '#ff9edb', 10, 1.2);
+      break;
+    case 'final_paycheck':
+      u.hp = Math.min(maxHp(u), u.hp + F(50));
+      for (const t of G.units) { if (isFoe(u, t)) t.oaSlowT = Math.max(t.oaSlowT, 5); }
+      if (u.isPlayer) addFloat(u.x, u.y - 16, '最终工资单！回血+全场减速', '#ffcf33', 10, 1.3);
+      break;
   }
   if (u.isPlayer) SFX.pickup();
 }
@@ -1460,6 +1512,15 @@ export function update(dt) {
 function updateUnit(u, dt) {
   u.hurtT -= dt; u.invulnT -= dt; u.stunT -= dt;
   u.buffs.spdT -= dt; u.buffs.fireT -= dt; u.buffs.dmgT -= dt;
+  /* 加班狂暴结束扣血 */
+  if (u._overtimeRecoil > 0) {
+    u._overtimeRecoil -= dt;
+    if (u._overtimeRecoil <= 0 && u.alive) {
+      const recoil = Math.round(maxHp(u) * .2);
+      u.hp = Math.max(1, u.hp - recoil);
+      if (u.isPlayer) { addFloat(u.x, u.y - 16, `加班后遗症 -${recoil} HP`, '#ff4f4f', 9, 1.2); addShake(3); }
+    }
+  }
   u.dashT -= dt;
   u.empowerT -= dt; u.reportedT -= dt; u.vulnT -= dt;
   u.reviewBoostT -= dt; u.oaSlowT -= dt;
@@ -1935,6 +1996,64 @@ function updateSubs(u, dt) {
       if (!u.isMoving) { s.t = .3; continue; }
       s.t = def.cd;
       G.burns.push({ x: u.x, y: u.y, r: def.radius[s.lv - 1] * u.mods.range, dps: 0, slow: .001, life: 1.2, t: 0, owner: u, color: '#c9a227', ringStun: true });
+    } else if (id === 'printer') {
+      /* 打印机：部署炮塔，持续射出穿透减速纸张 */
+      s.t = def.cd;
+      const mine = G.turrets.filter(tr => tr.owner === u && tr.kind === 'printer');
+      if (mine.length >= 1) mine[0].life = 0;
+      G.turrets.push({ x: u.x, y: u.y, owner: u, lv: s.lv, cd: .5, life: def.life, kind: 'printer', dmg: def.dmg[s.lv - 1] * u.mods.dmg });
+    } else if (id === 'whiteboard') {
+      /* 白板擦盾：周期性生成向前推进的白板（挡弹+撞击伤害） */
+      s.t = def.cd;
+      const ang = u.aim || 0;
+      const count = def.count[s.lv - 1];
+      for (let i = 0; i < count; i++) {
+        G.projs.push({ owner: u, x: u.x + Math.cos(ang) * 20, y: u.y - 4 + Math.sin(ang) * 20,
+          vx: Math.cos(ang) * 120, vy: Math.sin(ang) * 120, r: 8, dmg: def.dmg[s.lv - 1] * u.mods.dmg,
+          range: 150, dist: 0, shape: 'shield', color: '#e8e4d8', pierce: 99, block: true, life: 1.5 });
+      }
+    } else if (id === 'chair') {
+      /* 转椅漂移：向最近敌人冲刺，撞击伤害+击退 */
+      const r0 = 250;
+      const t = nearestUnit(u.x, u.y, r0, o => isFoe(u, o));
+      if (!t) { s.t = .4; continue; }
+      s.t = def.cd;
+      const ang = Math.atan2(t.y - u.y, t.x - u.x);
+      const spd = def.spd[s.lv - 1];
+      addFx({ type: 'slash', x: u.x, y: u.y - 4, ang, r: 50, spread: .6, color: '#c9d4e4', life: .15 });
+      /* 沿路径伤害 */
+      for (const o of G.units) {
+        if (!isFoe(u, o)) continue;
+        const d2l = distToSeg(o.x, o.y, u.x, u.y, u.x + Math.cos(ang) * 120, u.y + Math.sin(ang) * 120);
+        if (d2l < 12 + o.r) {
+          applyDamage(o, def.dmg[s.lv - 1] * u.mods.dmg, u, { stun: .3 });
+          o.x += Math.cos(ang) * 15; o.y += Math.sin(ang) * 15;
+        }
+      }
+      if (nearPlayer(u.x, u.y)) SFX.dash();
+    } else if (id === 'water_cooler') {
+      /* 饮水机炮台：部署减速+灼伤区域 */
+      s.t = def.cd;
+      const r = def.radius[s.lv - 1] * u.mods.range;
+      G.burns.push({ x: u.x, y: u.y, r, dps: def.dps[s.lv - 1] * u.mods.dmg, slow: .5, life: def.life, t: 0, owner: u, color: '#38d3e8' });
+    } else if (id === 'projector') {
+      /* 投影仪光炮：周期性宽光束扫射（穿透+持续伤害） */
+      const t = nearestUnit(u.x, u.y, 280, o => isFoe(u, o));
+      if (!t) { s.t = .4; continue; }
+      s.t = def.cd;
+      const ang = Math.atan2(t.y - u.y, t.x - u.x);
+      const w = 6 + s.lv * 2;
+      fireBeam(u, ang, 280, w, def.dmg[s.lv - 1] * u.mods.dmg, '#16dbcc');
+      if (nearPlayer(u.x, u.y)) SFX.laser();
+    } else if (id === 'phone') {
+      /* 电话弹射：周期性弹射电话机（弹跳多次） */
+      const t = nearestUnit(u.x, u.y, 200, o => isFoe(u, o));
+      if (!t) { s.t = .4; continue; }
+      s.t = def.cd;
+      const ang = Math.atan2(t.y - u.y, t.x - u.x);
+      const bounces = s.lv + 1;
+      spawnBullet(u, ang, { shape: 'dot', r: 4, spd: 280, range: 200, color: '#c9d4e4',
+        dmg: def.dmg[s.lv - 1] * u.mods.dmg, pierce: bounces, bounce: bounces, _echo: true });
     }
   }
 }
@@ -2065,6 +2184,49 @@ export function castActive() {
     pl.mods.revive = Math.max(pl.mods.revive, reallySlacking ? 1 : .5);
     addFloat(pl.x, pl.y - 20, reallySlacking ? '真摸鱼认证通过！' : '装忙没蒙混过去…', reallySlacking ? '#7ee08a' : '#9aa4b5', 8, 1.1);
     SFX.pickup();
+  } else if (id === 'overtime_burst') {
+    /* 加班狂暴：伤害×2+射速×2，结束后掉20%血 */
+    const dur = def.dur[lv - 1];
+    pl.buffs.dmgT = Math.max(pl.buffs.dmgT, dur); pl.buffs.dmgM = Math.max(pl.buffs.dmgM, 2);
+    pl.buffs.fireT = Math.max(pl.buffs.fireT, dur); pl.buffs.fireM = Math.max(pl.buffs.fireM, 2);
+    pl._overtimeRecoil = dur;  /* 记录结束时间，在 update 里扣血 */
+    addFloat(pl.x, pl.y - 20, '今晚不睡了！', '#ff4f4f', 10, 1.2);
+    addShake(3); SFX.boss();
+  } else if (id === 'dept_merge') {
+    /* 部门合并：全屏拉扯+碰撞爆炸 */
+    const r = def.radius[lv - 1];
+    addFx({ type: 'boom', x: pl.x, y: pl.y, r, color: '#6aa3ff', life: .5 });
+    for (const t of G.units) {
+      if (!isFoe(pl, t) || t.isBoss) continue;
+      if (dist2(pl.x, pl.y, t.x, t.y) > r * r) continue;
+      const a = Math.atan2(pl.y - t.y, pl.x - t.x);
+      t.x += Math.cos(a) * 60; t.y += Math.sin(a) * 60;
+      t.stunT = Math.max(t.stunT, 1);
+      applyDamage(t, 15 * pl.mods.dmg, pl);
+    }
+    addFloat(pl.x, pl.y - 20, '两个部门合一个！', '#6aa3ff', 10, 1.2);
+    addShake(6); SFX.explo();
+  } else if (id === 'whisteblow') {
+    /* 吹哨举报：全屏音波，固定伤害+目标当前血量百分比 */
+    addFx({ type: 'boom', x: pl.x, y: pl.y, r: 600, color: '#ffcf33', life: .4 });
+    for (const t of G.units) {
+      if (!isFoe(pl, t)) continue;
+      let d = (def.dmg[lv - 1] + t.hp * def.pct[lv - 1]) * pl.mods.dmg;
+      if (t.isBoss) d = Math.min(d, 200);
+      applyDamage(t, d, pl);
+    }
+    addFloat(pl.x, pl.y - 20, '匿名邮件已群发！', '#ffcf33', 10, 1.3);
+    addShake(8); SFX.zone();
+  } else if (id === 'ai_replace') {
+    /* AI替代通知：全场敌人停止移动和攻击 */
+    const dur = def.dur[lv - 1];
+    for (const t of G.units) {
+      if (!isFoe(pl, t)) continue;
+      t.stunT = Math.max(t.stunT, t.isBoss ? dur * .5 : dur);
+      t._aiReplaced = dur;
+    }
+    addFloat(pl.x, pl.y - 20, '你的岗位已被AI接管', '#4ec9a0', 10, 1.3);
+    SFX.levelup();
   }
   bridge.notify();
 }

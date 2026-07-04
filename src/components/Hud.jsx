@@ -102,7 +102,9 @@ export default function Hud() {
   const curses = Object.entries(pl.curses).filter(([, v]) => v > 0);
 
   const phases = G.zonePhases || TUNE.zonePhases;
-  const nextZone = G.trial.active
+  const nextZone = G.mode === 'endless'
+    ? <span style={{ color: '#ff9440' }}>第 <b>{G.endlessWave}</b> 波 · 下一波 {Math.max(0, Math.ceil(G.endlessWaveT))}s</span>
+    : G.trial.active
     ? <span style={{ color: '#7ee08a' }}>试用期 第 <b>{G.trial.wave}/{G.trial.months}</b> 月 · {Math.max(0, Math.ceil(G.trial.waveT))}s</span>
     : z.shrinking ? <b>红线收缩中！</b>
     : z.phase < phases.length
@@ -157,6 +159,7 @@ export default function Hud() {
         <Minimap />
         <div className="tag">{fmtTime(G.t)}</div>
         <div className="tag">优化他人 <b>{G.kills}</b></div>
+        {G.goldEarned > 0 && <div className="tag" style={{ color: '#ffcf33' }}>💰 {G.goldEarned}</div>}
         {!touch.using && (
           <div className="tag" style={{ opacity: .85 }}>开火 <b>{FIRE_MODES[getFireMode()]}</b> · T</div>
         )}
@@ -188,7 +191,7 @@ export default function Hud() {
             <div id="wpn-name">
               {w.leg
                 ? <><span className="leg-name">「{def.name}」</span><small>传说</small></>
-                : <>{def.name}<small>{def.country === 'CN' ? '国产' : '硅谷'}</small></>}
+                : <>{def.name}<small>{def.country === 'CN' ? '国产' : def.country === 'US' ? '硅谷' : '国际'}</small></>}
             </div>
             <div id="wpn-pips">
               {[0, 1, 2, 3, 4].map(i => (

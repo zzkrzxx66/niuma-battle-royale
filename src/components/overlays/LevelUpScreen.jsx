@@ -10,7 +10,7 @@ export default function LevelUpScreen() {
     <div className="overlay">
       <div className="overlay-body">
         <div className="paper">
-          <div className="doc-no">内部晋升 · 第 {pl.level} 级 · 三选一，过时不候</div>
+          <div className="doc-no">内部晋升 · 第 {pl.level} 级 · {choices.length}选一，过时不候</div>
           <h2>晋升审批单</h2>
           <div className="sub">恭喜升职！请选择一项"个人发展方向"（选错概不负责）</div>
           {G.rerollCredits > 0 && (
