@@ -13,6 +13,7 @@ import { SUBS, MAX_SUB_SLOTS } from './data/subweapons.js';
 import { ACTIVES } from './data/actives.js';
 import { EVOLUTIONS } from './data/evolutions.js';
 import { COPY } from './data/copy.js';
+import { SHOP_ITEMS, loadShopUpgrades, purchaseUpgrade, computeUpgrades } from './data/shop.js';
 import { SPR, workerSprite, SHIRT_COLORS } from './sprites.js';
 import { SFX, beep, later, cancelPendingSfx, initAudio } from './audio.js';
 import { BGM } from './bgm.js';
@@ -839,6 +840,8 @@ export function gainXp(u, amt) {
     amt *= .42;   // 0.6→0.42，配合底数1.26与新怪物xp/hp值放慢试用期升级节奏，见设计文档第2节
     G.trialXpEarned = (G.trialXpEarned || 0) + amt * u.mods.xp;   // 记账：转正同事按此补发育
   }
+  /* 商城永久经验加成 */
+  if (G && G.xpBonus && u.isPlayer) amt *= (1 + G.xpBonus);
   u.xp += amt * u.mods.xp;
   while (u.xp >= TUNE.levelNeed(u.level)) {
     u.xp -= TUNE.levelNeed(u.level);
@@ -3012,7 +3015,7 @@ function openLevelup() {
   const cards = buildDraftPool(pl);
   /* 加权无放回抽 3 张 */
   const picked = [];
-  while (picked.length < 3 && cards.length) {
+  while (picked.length < (G.extraCard ? 4 : 3) && cards.length) {
     const total = cards.reduce((a, c) => a + c.w, 0);
     let r = Math.random() * total;
     let idx = 0;
@@ -3097,11 +3100,13 @@ export function startGame(mode) {
   cancelPendingSfx();
   bridge.emit('feed-clear');
   const gm = mode || (typeof localStorage !== 'undefined' && localStorage.getItem('niuma_mode')) || 'battle';
+  const upgrades = computeUpgrades(loadShopUpgrades());
   if (gm === 'endless') {
     G = newGame(6, 'endless');   /* 6 个月试用期作为热身，之后无尽波 */
     G.trial.active = false; G.trialOffset = 0;  /* 直接到无尽模式 */
     setState('playing');
     warn('无尽模式：没有缩圈，没有终点，活到最后一波！');
+    applyShopUpgrades(upgrades);
     return;
   }
   let months = 3;
@@ -3112,6 +3117,40 @@ export function startGame(mode) {
   warn(months > 0
     ? `HR：签到成功。试用期 ${months} 个月，期间同事互不伤害，先把琐事清了。`
     : 'HR：签到成功，欢迎参加本季度大逃杀。');
+  applyShopUpgrades(upgrades);
+}
+
+/* 应用商城永久升级到当前游戏状态 */
+function applyShopUpgrades(up) {
+  if (!G || !G.player) return;
+  const pl = G.player;
+  if (up.hpBonus) { pl.hp += up.hpBonus; pl.hpBase += up.hpBonus; }
+  if (up.spdBonus) { pl.spdBase *= (1 + up.spdBonus); }
+  if (up.dmgBonus) { pl.mods.dmg *= (1 + up.dmgBonus); }
+  if (up.fireRateBonus) { pl.mods.fireRate *= (1 + up.fireRateBonus); }
+  if (up.startShield) { pl.shield = up.startShield; pl.shieldT = 10; }
+  if (up.xpBonus) { G.xpBonus = up.xpBonus; } else { G.xpBonus = 0; }
+  if (up.startLevel) {
+    for (let i = 0; i < up.startLevel; i++) {
+      pl.level++;
+      G.pendingLevels++;
+    }
+  }
+  if (up.startItems) {
+    for (let i = 0; i < up.startItems; i++) {
+      spawnItem(G, undefined, pl.x + rand(-20, 20), pl.y + rand(-20, 20));
+    }
+  }
+  if (up.extraCard) { G.extraCard = true; }
+  if (up.chooseWeapon) {
+    try {
+      const wId = localStorage.getItem('niuma_chosen_weapon');
+      if (wId && WEAPONS[wId]) {
+        G.player.weapon.id = wId;
+        G.player.weapon.lvl = 1;
+      }
+    } catch (e) { /* ignore */ }
+  }
 }
 export function backToMenu() { setState('menu'); }
 export function togglePause() {
@@ -3161,6 +3200,7 @@ if (typeof window !== 'undefined') {
   window.__niuma = {
     getG, getState, update, startGame, backToMenu, togglePause, pickLevelChoice,
     cycleFireMode, getFireMode, castActive, loadGold, loadEndlessBest,
+    loadShopUpgrades, purchaseUpgrade, computeUpgrades, SHOP_ITEMS,
     playerSwap, playerFuse, playerDash,
     applyDamage, applyCurse, applyTechPickup, applySkill, gainXp, nearestUnit, isFoe,
     aliveWorkers, chipObtainable,

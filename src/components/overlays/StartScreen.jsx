@@ -7,6 +7,8 @@ import { COPY } from '../../game/data/copy.js';
 import { chipSprite } from '../../game/sprites.js';
 import { IS_TOUCH } from '../../game/input.js';
 import { startGame, loadBest, loadGold, loadEndlessBest } from '../../game/core.js';
+import { loadShopUpgrades, getUpgradeLevel } from '../../game/data/shop.js';
+import ShopScreen from './ShopScreen.jsx';
 import { pick } from '../../game/utils.js';
 import workerNative from '../../assets/worker_native.png';
 
@@ -35,6 +37,12 @@ export default function StartScreen() {
   const gold = useMemo(() => loadGold(), []);
   const endlessBest = useMemo(() => loadEndlessBest(), []);
   const wRows = country => Object.entries(WEAPONS).filter(([, d]) => d.country === country);
+  const [shopOpen, setShopOpen] = useState(false);
+  const hasChooseWeapon = getUpgradeLevel(loadShopUpgrades(), 'start_weapon') > 0;
+  const [chosenWeapon, setChosenWeapon] = useState(() => {
+    try { return localStorage.getItem('niuma_chosen_weapon') || ''; } catch (e) { return ''; }
+  });
+  const allWeapons = Object.entries(WEAPONS);
 
   return (
     <div className="overlay">
@@ -90,11 +98,31 @@ export default function StartScreen() {
                 : `${trial} 个月发育期（充分发育，后期琐事凶猛；缩圈相应提前）`}
             </span>
           </div>
+          {hasChooseWeapon && (
+            <div className="trial-row" style={{ flexWrap: 'wrap', marginTop: '6px' }}>
+              <span className="trial-label">内推信 · 开局武器：</span>
+              <select
+                value={chosenWeapon}
+                onChange={e => {
+                  setChosenWeapon(e.target.value);
+                  try { localStorage.setItem('niuma_chosen_weapon', e.target.value); } catch (err) {}
+                }}
+                style={{ fontSize: '11px', padding: '2px 6px', border: '2px solid #000', background: '#fff', color: 'var(--ink)', fontFamily: 'var(--mono)', maxWidth: '160px' }}
+              >
+                <option value="">随机</option>
+                {allWeapons.map(([id, d]) => (
+                  <option key={id} value={id}>{d.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <div className="btn-row">
             <button className="btn" onClick={() => startGame('battle')}>大逃杀</button>
             <button className="btn" style={{ background: 'var(--us)', color: '#fff' }} onClick={() => startGame('endless')}>无尽模式</button>
+            <button className="btn" style={{ background: 'var(--badge)' }} onClick={() => setShopOpen(true)}>💰 商城</button>
             <button className="btn ghost" onClick={() => setDexOpen(o => !o)}>图鉴 {dexOpen ? '▴' : '▾'}</button>
           </div>
+          {shopOpen && <ShopScreen onClose={() => setShopOpen(false)} />}
           {dexOpen && (
             <div id="dex">
               <div className="dex-sec">— 国产队 —</div>
