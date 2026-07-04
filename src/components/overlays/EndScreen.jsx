@@ -11,12 +11,20 @@ export default function EndScreen({ win }) {
   const docNo = useMemo(() => randi(10000, 99999), []);
   const techCount = Object.values(pl.tech).reduce((a, b) => a + b, 0);
   const quote = win ? (G.winLine || pick(COPY.winLines)) : G.deathLine;
+  const isEndless = G.mode === 'endless';
 
   return (
     <div className="overlay">
       <div className="overlay-body">
         <div className="paper">
-          {win ? (
+          {isEndless ? (
+            <>
+              <div className="doc-no">加班记录 · 编号 OT-{docNo}</div>
+              <h2>加 班 倒 下</h2>
+              <div className="stamp" style={{ borderColor: '#ff9440', color: '#ff9440' }}>过劳<br />倒下</div>
+              <div className="sub">在无尽加班中撑到了第 {G.endlessWave} 波，最终倒在了工位上。</div>
+            </>
+          ) : win ? (
             <>
               <div className="doc-no">表彰文件 · 抄送全体（已离职）成员</div>
               <h2>优秀员工证书</h2>
@@ -32,15 +40,32 @@ export default function EndScreen({ win }) {
             </>
           )}
           <hr />
-          <div className="rank-big">#{win ? 1 : G.playerRank}<small> / {TUNE.botCount + 1}</small></div>
-          <table className="stat-table"><tbody>
-            <tr><td>存活时间</td><td>{fmtTime(G.t)}</td></tr>
-            <tr><td>优化同事</td><td>{G.kills} 人</td></tr>
-            <tr><td>最终职级</td><td>LV.{pl.level}</td></tr>
-            <tr><td>随身武器</td><td>{wpnName(pl)}</td></tr>
-            <tr><td>装备模组</td><td>{techCount} 个</td></tr>
-          </tbody></table>
-          {!win && G.deathInfo && (
+          {isEndless ? (
+            <>
+              <div className="rank-big">第 {G.endlessWave} <small>波</small></div>
+              <table className="stat-table"><tbody>
+                <tr><td>存活时间</td><td>{fmtTime(G.t)}</td></tr>
+                <tr><td>击杀总数</td><td>{G.kills} 个</td></tr>
+                <tr><td>最终职级</td><td>LV.{pl.level}</td></tr>
+                <tr><td>随身武器</td><td>{wpnName(pl)}</td></tr>
+                <tr><td>装备模组</td><td>{techCount} 个</td></tr>
+                <tr><td>💰 获得金币</td><td style={{ color: '#ffcf33' }}>+{G.goldEarned}</td></tr>
+                {G.totalGold != null && <tr><td>💰 金币总余额</td><td style={{ color: '#ffcf33' }}>{G.totalGold}</td></tr>}
+              </tbody></table>
+            </>
+          ) : (
+            <>
+              <div className="rank-big">#{win ? 1 : G.playerRank}<small> / {TUNE.botCount + 1}</small></div>
+              <table className="stat-table"><tbody>
+                <tr><td>存活时间</td><td>{fmtTime(G.t)}</td></tr>
+                <tr><td>优化同事</td><td>{G.kills} 人</td></tr>
+                <tr><td>最终职级</td><td>LV.{pl.level}</td></tr>
+                <tr><td>随身武器</td><td>{wpnName(pl)}</td></tr>
+                <tr><td>装备模组</td><td>{techCount} 个</td></tr>
+              </tbody></table>
+            </>
+          )}
+          {!win && !isEndless && G.deathInfo && (
             <div className="quote" style={{ borderLeftColor: 'var(--danger)' }}>
               致命一击：被 {G.deathInfo.killer}{G.deathInfo.weapon ? ` 用 ${G.deathInfo.weapon}` : ''} 优化。
               {G.deathInfo.remaining > 0 && G.deathInfo.remaining <= 3 ? ` 距离吃鸡只差 ${G.deathInfo.remaining} 人！` : ''}
@@ -48,10 +73,13 @@ export default function EndScreen({ win }) {
             </div>
           )}
           <div className="quote">{quote}</div>
-          {G.newBest && <div className="stamp newbest">新纪录<br />NEW</div>}
+          {G.newBest && !isEndless && <div className="stamp newbest">新纪录<br />NEW</div>}
+          {G.newEndlessBest && isEndless && <div className="stamp newbest">新纪录<br />NEW</div>}
           {win && <div className="art-boss" style={{ backgroundImage: `url(${bossNative})` }} />}
           <div className="btn-row">
-            <button className="btn" onClick={startGame}>{win ? '再上一天班' : '重新入职'}</button>
+            <button className="btn" onClick={() => startGame(isEndless ? 'endless' : 'battle')}>
+              {isEndless ? '继续加班' : win ? '再上一天班' : '重新入职'}
+            </button>
             <button className="btn ghost" onClick={backToMenu}>回到大厅</button>
           </div>
         </div>

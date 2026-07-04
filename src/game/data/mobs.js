@@ -45,6 +45,35 @@ export const MOBS = {
   /* 深夜加班灯：静止环境怪，玩家进入光照范围中易伤（复用 vulnT），易碎、经验较高 */
   night_lamp: { name: '深夜加班灯', hp: 8, spd: 0, touch: 0, xp: 5, jig: false,
     lampR: 80, spr: 'mob_lamp' },
+  /* ===== v2.0 新增怪物 ===== */
+  intern_swarm: { name: '实习生大军', hp: 4, spd: 150, touch: 1, xp: .6, jig: false,
+    groupSize: 8, groupBonusXp: 8, spr: 'mob_army' },
+  tech_debt: { name: '技术债幽灵', hp: 40, spd: 70, touch: 5, xp: 5, jig: false,
+    shieldHp: 15, spr: 'mob_wheel' },
+  scope_creep: { name: '需求蔓延体', hp: 30, spd: 80, touch: 4, xp: 4, jig: true,
+    split: true, splitChance: .5, splitCount: 2, splitInto: 'read_reply', spr: 'mob_cr' },
+  burnout: { name: '职业倦怠体', hp: 35, spd: 55, touch: 5, xp: 5, jig: false,
+    auraR: 60, auraDot: 3, auraSlowPct: .5, spr: 'mob_urgent' },
+  age_35: { name: '35岁危机', hp: 80, spd: 115, touch: 8, xp: 12, jig: false,
+    spr: 'mob_hunter' },
+  devops_pipeline: { name: 'CI/CD流水线', hp: 50, spd: 0, touch: 0, xp: 8, jig: false,
+    reviewR: 130, spr: 'mob_reviewboard' },
+  all_hands: { name: '全员大会通告', hp: 25, spd: 40, touch: 3, xp: 4, jig: false,
+    vanishEvery: 5, vanishDur: 2, spr: 'mob_meeting' },
+  phishing_mail: { name: '钓鱼邮件', hp: 10, spd: 145, touch: 2, xp: 2, jig: false,
+    split: true, splitChance: .4, splitCount: 2, splitInto: 'phishing_mail', spr: 'mob_ccbomb' },
+  legacy_code: { name: '屎山代码', hp: 60, spd: 35, touch: 6, xp: 7, jig: false,
+    recallChance: .6, spr: 'mob_recall' },
+  kpi_review: { name: 'KPI 述职报告', hp: 70, spd: 50, touch: 7, xp: 10, jig: false,
+    reworkThreshold: 30, spr: 'mob_rework' },
+  pdd_master: { name: 'PPT大师·觉醒', hp: 120, spd: 90, touch: 10, xp: 15, jig: false,
+    dodgeOverride: .4, spr: 'mob_ghostreply' },
+  overtime_devil: { name: '加班魔王', hp: 100, spd: 100, touch: 9, xp: 12, jig: false,
+    reworkThreshold: 40, spr: 'mob_rework' },
+  merged_dept: { name: '部门合并风暴', hp: 55, spd: 75, touch: 6, xp: 8, jig: true,
+    split: true, splitChance: .3, splitCount: 3, splitInto: 'read_reply', spr: 'mob_cr' },
+  silent_quit: { name: '静默离职者', hp: 20, spd: 100, touch: 2, xp: 3, jig: false,
+    vanishEvery: 6, vanishDur: 3, spr: 'mob_meeting' },
 };
 
 /* 每月波次：试用期同事未到岗，全部琐事都冲玩家来——月初爆发 + 持续涓流保证割草密度
@@ -53,10 +82,12 @@ export const MOBS = {
 export function waveComp(month) {
   const burst = 12 + 5 * (month - 1);        // 月初爆发波
   const cap = 10 + 2 * month;                 // 场上存活上限（涓流补到这个数）
-  const types = month <= 1 ? ['email', 'cc_bomb', 'reinvent_wheel']
-    : month === 2 ? ['email', 'sticky', 'cc_bomb', 'reinvent_wheel', 'meeting_invite', 'message_recall']
-    : month === 3 ? ['email', 'sticky', 'cc_bomb', 'meeting_invite', 'message_recall', 'urgent_meeting', 'outsourced_army']
-    : month === 4 ? ['email', 'sticky', 'cr', 'cc_bomb', 'meeting_invite', 'urgent_meeting', 'outsourced_army', 'overtime_rework', 'req_review_board']
-    : ['email', 'sticky', 'cr', 'cc_bomb', 'meeting_invite', 'urgent_meeting', 'outsourced_army', 'overtime_rework', 'req_review_board', 'read_no_reply_ultimate'];
+  const types = month <= 1 ? ['email', 'cc_bomb', 'reinvent_wheel', 'phishing_mail']
+    : month === 2 ? ['email', 'sticky', 'cc_bomb', 'reinvent_wheel', 'meeting_invite', 'message_recall', 'intern_swarm', 'all_hands']
+    : month === 3 ? ['email', 'sticky', 'cc_bomb', 'meeting_invite', 'message_recall', 'urgent_meeting', 'outsourced_army', 'burnout', 'scope_creep']
+    : month === 4 ? ['email', 'sticky', 'cr', 'cc_bomb', 'meeting_invite', 'urgent_meeting', 'outsourced_army', 'overtime_rework', 'req_review_board', 'tech_debt', 'legacy_code']
+    : month === 5 ? ['email', 'sticky', 'cr', 'cc_bomb', 'meeting_invite', 'urgent_meeting', 'outsourced_army', 'overtime_rework', 'req_review_board', 'read_no_reply_ultimate', 'tech_debt', 'merged_dept', 'silent_quit']
+    : month === 6 ? ['email', 'sticky', 'cr', 'cc_bomb', 'meeting_invite', 'urgent_meeting', 'outsourced_army', 'overtime_rework', 'devops_pipeline', 'read_no_reply_ultimate', 'tech_debt', 'merged_dept', 'kpi_review', 'age_35']
+    : ['email', 'sticky', 'cr', 'cc_bomb', 'meeting_invite', 'urgent_meeting', 'outsourced_army', 'overtime_rework', 'devops_pipeline', 'read_no_reply_ultimate', 'tech_debt', 'merged_dept', 'kpi_review', 'age_35', 'pdd_master', 'overtime_devil'];
   return { burst, cap, types };
 }

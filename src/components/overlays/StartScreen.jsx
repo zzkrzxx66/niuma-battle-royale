@@ -6,7 +6,7 @@ import { ACTIVES } from '../../game/data/actives.js';
 import { COPY } from '../../game/data/copy.js';
 import { chipSprite } from '../../game/sprites.js';
 import { IS_TOUCH } from '../../game/input.js';
-import { startGame, loadBest } from '../../game/core.js';
+import { startGame, loadBest, loadGold, loadEndlessBest } from '../../game/core.js';
 import { pick } from '../../game/utils.js';
 import workerNative from '../../assets/worker_native.png';
 
@@ -32,6 +32,8 @@ export default function StartScreen() {
   };
   const tip = useMemo(() => pick(COPY.tips), []);
   const best = useMemo(() => loadBest(), []);
+  const gold = useMemo(() => loadGold(), []);
+  const endlessBest = useMemo(() => loadEndlessBest(), []);
   const wRows = country => Object.entries(WEAPONS).filter(([, d]) => d.country === country);
 
   return (
@@ -64,6 +66,16 @@ export default function StartScreen() {
               历史最佳：第 <b>{best.rank}</b> 名 · 优化 {best.kills} 人 —— 还能更卷。
             </div>
           )}
+          {endlessBest > 0 && (
+            <div className="tip-line" style={{ color: '#ff9440' }}>
+              无尽模式最高记录：第 <b>{endlessBest}</b> 波
+            </div>
+          )}
+          {gold > 0 && (
+            <div className="tip-line" style={{ color: '#ffcf33' }}>
+              💰 金币余额：<b>{gold}</b>
+            </div>
+          )}
           <div className="trial-row">
             <span className="trial-label">试用期（每月一波琐事 + 月度考核 Boss，期间同事互不伤害）：</span>
             {[0, 1, 2, 3, 4, 5, 6].map(m => (
@@ -79,10 +91,9 @@ export default function StartScreen() {
             </span>
           </div>
           <div className="btn-row">
-            <button className="btn" onClick={startGame}>签到进场</button>
-            <button className="btn ghost" onClick={() => setDexOpen(o => !o)}>武器图鉴 {dexOpen ? '▴' : '▾'}</button>
-            <a className="btn ghost" href="https://github.com/pikapikaspeedup/ai_run_feibo5"
-              target="_blank" rel="noopener noreferrer">★ GitHub 开源仓库</a>
+            <button className="btn" onClick={() => startGame('battle')}>大逃杀</button>
+            <button className="btn" style={{ background: 'var(--us)', color: '#fff' }} onClick={() => startGame('endless')}>无尽模式</button>
+            <button className="btn ghost" onClick={() => setDexOpen(o => !o)}>图鉴 {dexOpen ? '▴' : '▾'}</button>
           </div>
           {dexOpen && (
             <div id="dex">
@@ -96,6 +107,12 @@ export default function StartScreen() {
               {wRows('US').map(([id, d]) => (
                 <div className="dex-row" key={id}>
                   <DexIcon color={d.color} /><span className="d-name d-us">{d.name}</span><span className="d-pat">{d.pat}</span>
+                </div>
+              ))}
+              <div className="dex-sec">— 国际队 —</div>
+              {wRows('EU').concat(wRows('RU')).map(([id, d]) => (
+                <div className="dex-row" key={id}>
+                  <DexIcon color={d.color} /><span className="d-name" style={{ color: '#e8a020' }}>{d.name}</span><span className="d-pat">{d.pat}</span>
                 </div>
               ))}
               <div className="dex-sec">— 传说融合 —</div>

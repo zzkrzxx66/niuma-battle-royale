@@ -161,9 +161,12 @@ export const speedOf = u => {
 };
 
 /* ---------- 对局创建 ---------- */
-function newGame(trialMonths = 0) {
+function newGame(trialMonths = 0, mode = 'battle') {
   const W = TUNE.world;
   const g = {
+    mode,  /* 'battle' | 'endless' */
+    endlessWave: 0, endlessWaveT: 30, endlessBurstLeft: 0, endlessMobsAlive: 0,
+    goldEarned: 0,
     /* 试用期：每月 30 秒一波杂鱼 + 一个月度考核小 Boss；期间同事互相无敌 */
     trial: { months: trialMonths, active: trialMonths > 0, wave: 0, waveT: .01, bossThisWave: true,
       bossOrder: shuffle(['ppt', 'meeting', 'intern', 'attendance']), cdWarned: false },   // 考核池只含无需同事在场的四位
@@ -776,6 +779,7 @@ function killUnit(victim, killer, cause) {
       spawnItem(G, undefined, victim.x + rand(-10, 10), victim.y + rand(-10, 10));
     if (killer.isPlayer) {
       G.kills++; SFX.kill();
+      earnGold(1);  /* 每杀一个得 1 金币 */
       G.freezeT = .07;
       if (G.t - (G.lastKillT === undefined ? -9 : G.lastKillT) < 3) G.streak++;
       else G.streak = 1;
@@ -1278,6 +1282,7 @@ export function update(dt) {
   }
 
   updateZone(dt);
+  updateEndless(dt);
 
   /* 濒死心跳 */
   if (G.player.alive && G.player.hp < maxHp(G.player) * .3) {
@@ -1730,7 +1735,7 @@ function botThink(u, dt) {
 
 /* ---------- 缩圈（时间轴从试用期结束后起算） ---------- */
 function updateZone(dt) {
-  if (G.trial.active) return;
+  if (G.trial.active || G.mode === 'endless') return;
   const bt = G.t - G.trialOffset;   // 战斗时间
   const z = G.zone, phases = G.zonePhases;   // 试用期越长时间轴越前移（割草流清场快）
   if (z.phase < phases.length && bt >= phases[z.phase].at) {
@@ -2838,18 +2843,90 @@ export function playerDash() {
   SFX.dash();
 }
 
+/* ---------- 金币系统（localStorage 持久化） ---------- */
+export function loadGold() {
+  try { return parseInt(localStorage.getItem('niuma_gold') || '0', 10) || 0; } catch (e) { return 0; }
+}
+function saveGold(v) {
+  try { localStorage.setItem('niuma_gold', String(v)); } catch (e) { /* ignore */ }
+}
+export function loadEndlessBest() {
+  try { return parseInt(localStorage.getItem('niuma_endless_best') || '0', 10) || 0; } catch (e) { return 0; }
+}
+function saveEndlessBest(wave) {
+  try {
+    const best = loadEndlessBest();
+    if (wave > best) { localStorage.setItem('niuma_endless_best', String(wave)); return true; }
+  } catch (e) { /* ignore */ }
+  return false;
+}
+/* 击杀获得金币 */
+function earnGold(amount) {
+  if (!G) return;
+  G.goldEarned += amount;
+}
+
+/* ---------- 无尽模式波次生成 ---------- */
+function updateEndless(dt) {
+  if (G.mode !== 'endless') return;
+  const g = G;
+  /* 统计存活杂鱼数量 */
+  g.endlessMobsAlive = g.units.filter(u => u.alive && u.isMob).length;
+  /* 波次计时器 */
+  g.endlessWaveT -= dt;
+  if (g.endlessWaveT <= 0 && g.endlessMobsAlive < 20 + g.endlessWave * 2) {
+    g.endlessWave++;
+    const wc = waveComp(Math.min(7, 1 + Math.floor(g.endlessWave / 2)));
+    const burst = wc.burst + Math.floor(g.endlessWave * 1.5);
+    g.endlessBurstLeft = Math.min(burst, 40);
+    g.endlessWaveT = Math.max(12, 30 - g.endlessWave * 0.5);
+    warn(`第 ${g.endlessWave} 波来袭！`);
+    SFX.zone();
+    /* 每波奖励金币 */
+    earnGold(5 + g.endlessWave);
+    addFloat(g.player.x, g.player.y - 22, `+${5 + g.endlessWave} 金币`, '#ffcf33', 9, 1.2);
+  }
+  /* 分批涌入 */
+  if (g.endlessBurstLeft > 0) {
+    const wc = waveComp(Math.min(7, 1 + Math.floor(g.endlessWave / 2)));
+    const types = wc.types;
+    /* 无尽模式高波次时数值倍增 */
+    const hpMul = 1 + g.endlessWave * 0.15;
+    const dmgMul = 1 + g.endlessWave * 0.08;
+    for (let i = 0; i < 3 && g.endlessBurstLeft > 0; i++) {
+      const id = pick(types);
+      const def = MOBS[id];
+      if (!def) continue;
+      const a = rand(0, Math.PI * 2);
+      const rr = rand(200, 400);
+      const mx = clamp(g.player.x + Math.cos(a) * rr, 30, TUNE.world - 30);
+      const my = clamp(g.player.y + Math.sin(a) * rr, 30, TUNE.world - 30);
+      spawnMob(id, mx, my, false, g.endlessWave);
+      g.endlessBurstLeft--;
+    }
+  }
+}
+
 /* ---------- 终局判定 ---------- */
 function endChecks(dt) {
   if (G.endT > 0) {
     G.endT -= dt;
     if (G.endT <= 0) {
-      G.newBest = saveBest(G.playerRank, G.kills);
-      if (G.newBest) SFX.levelup();
+      if (G.mode === 'endless') {
+        G.newEndlessBest = saveEndlessBest(G.endlessWave);
+        const gold = G.goldEarned;
+        saveGold(loadGold() + gold);
+        G.totalGold = loadGold();
+      } else {
+        G.newBest = saveBest(G.playerRank, G.kills);
+        if (G.newBest) SFX.levelup();
+      }
       setState('dead');
     }
     return;
   }
   if (!G.player.alive) return;
+  if (G.mode === 'endless') return;  /* 无尽模式没有胜利条件 */
   /* Boss 双门槛：战斗时间 300s 或场上只剩 3 个牛马——保证多数对局都能见到老板 */
   if (!G.bossSpawned && !G.trial.active && (G.t - G.trialOffset >= 300 || aliveWorkers() <= 3)) spawnBoss();
   if (G.winT === undefined && aliveWorkers() === 1 && G.bossSpawned && G.bossDead) {
@@ -2998,15 +3075,23 @@ function checkEvolutions(pl) {
 }
 
 /* ---------- 状态机 / 全局操作 ---------- */
-export function startGame() {
+export function startGame(mode) {
   initAudio();
   BGM.init();
   cancelPendingSfx();
   bridge.emit('feed-clear');
+  const gm = mode || (typeof localStorage !== 'undefined' && localStorage.getItem('niuma_mode')) || 'battle';
+  if (gm === 'endless') {
+    G = newGame(6, 'endless');   /* 6 个月试用期作为热身，之后无尽波 */
+    G.trial.active = false; G.trialOffset = 0;  /* 直接到无尽模式 */
+    setState('playing');
+    warn('无尽模式：没有缩圈，没有终点，活到最后一波！');
+    return;
+  }
   let months = 3;
   try { months = parseInt(localStorage.getItem('niuma_trial') ?? '3', 10); } catch (e) { /* ignore */ }
   months = clamp(isNaN(months) ? 3 : months, 0, 6);
-  G = newGame(months);
+  G = newGame(months, 'battle');
   setState('playing');
   warn(months > 0
     ? `HR：签到成功。试用期 ${months} 个月，期间同事互不伤害，先把琐事清了。`
@@ -3059,7 +3144,7 @@ function saveBest(rank, kills) {
 if (typeof window !== 'undefined') {
   window.__niuma = {
     getG, getState, update, startGame, backToMenu, togglePause, pickLevelChoice,
-    cycleFireMode, getFireMode, castActive,
+    cycleFireMode, getFireMode, castActive, loadGold, loadEndlessBest,
     playerSwap, playerFuse, playerDash,
     applyDamage, applyCurse, applyTechPickup, applySkill, gainXp, nearestUnit, isFoe,
     aliveWorkers, chipObtainable,
