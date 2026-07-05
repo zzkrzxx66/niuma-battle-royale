@@ -6,7 +6,7 @@ import { TECH, CURSES, DISTILLS } from '../game/data/tech.js';
 import { SUBS } from '../game/data/subweapons.js';
 import { ACTIVES } from '../game/data/actives.js';
 import { chipSprite } from '../game/sprites.js';
-import { touch } from '../game/input.js';
+import { touch, IS_TOUCH } from '../game/input.js';
 import { getG, maxHp, aliveWorkers, chipObtainable, getFireMode, FIRE_MODES } from '../game/core.js';
 import { drawMinimap } from '../game/render.js';
 import * as bridge from '../game/bridge.js';
@@ -86,10 +86,10 @@ export default function Hud() {
     const rp = recipePartner(w.id);
     hint = w.lvl >= 5
       ? (chipObtainable(rp.partner)
-        ? <>满级！找 <b>{WEAPONS[rp.partner].name}</b> 芯片按 F 融合 →「{LEGENDS[rp.leg].name}」</>
-        : <>满级！搭档芯片已绝版——按 E 换装其他芯片再练</>)
+        ? <>满级！找 <b>{WEAPONS[rp.partner].name}</b> 芯片{IS_TOUCH ? '点融合按钮' : '按 F 融合'} →「{LEGENDS[rp.leg].name}」</>
+        : <>满级！搭档芯片已绝版——{IS_TOUCH ? '点换枪按钮' : '按 E'} 换装其他芯片再练</>)
       : <>捡同款芯片升级（{w.lvl}/5）· 融合搭档：{WEAPONS[rp.partner].name}</>;
-    if (def.kind === 'charge') hint = <>按住鼠标蓄力，松开发射 · {hint}</>;
+    if (def.kind === 'charge') hint = <>{IS_TOUCH ? '长按蓄力，松开发射' : '按住鼠标蓄力，松开发射'} · {hint}</>;
   }
 
   /* 拾取提示 */
@@ -180,7 +180,7 @@ export default function Hud() {
       <div className="hud-bc">
         {pl.active && (
           <div id="active-chip" className={pl.activeCd > 0 ? 'cd' : ''}>
-            <b>Q</b>
+            <b>{IS_TOUCH ? '⚡' : 'Q'}</b>
             <span>{ACTIVES[pl.active.id].name} Lv{pl.active.lv}</span>
             <i>{pl.activeCd > 0 ? Math.ceil(pl.activeCd) + 's' : '就绪'}</i>
           </div>

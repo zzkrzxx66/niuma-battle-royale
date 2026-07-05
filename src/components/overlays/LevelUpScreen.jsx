@@ -1,6 +1,8 @@
 import React from 'react';
 import { getG, getLevelChoices, pickLevelChoice, rerollLevelup } from '../../game/core.js';
 
+import { IS_TOUCH } from '../../game/input.js';
+
 export default function LevelUpScreen() {
   const G = getG();
   const pl = G.player;
@@ -30,7 +32,7 @@ export default function LevelUpScreen() {
                 <div className="k-eff">{s.eff}</div>
                 {s.rare && <div className="k-eff" style={{ color: '#c9a227' }}>★ 精修版：效果双倍</div>}
                 <div className="k-tag">{s.tag}</div>
-                <div className="k-key">{i + 1}</div>
+                {!IS_TOUCH && <div className="k-key">{i + 1}</div>}
               </div>
             ))}
           </div>
