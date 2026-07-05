@@ -17,7 +17,7 @@ import { SHOP_ITEMS, loadShopUpgrades, purchaseUpgrade, computeUpgrades } from '
 import { SPR, workerSprite, SHIRT_COLORS } from './sprites.js';
 import { SFX, beep, later, cancelPendingSfx, initAudio } from './audio.js';
 import { BGM } from './bgm.js';
-import { keys, mouse, touch, handlers } from './input.js';
+import { keys, mouse, touch, handlers, IS_TOUCH } from './input.js';
 import * as bridge from './bridge.js';
 
 /* ---------- 对外状态 ---------- */
@@ -1422,7 +1422,7 @@ export function update(dt) {
 
   for (const u of G.units) if (u.alive) updateUnit(u, dt);
 
-  /* 订书机炮台 / 消防警报喷淋装置 */
+  /* 订书机炮台 / 消防警报喷淋装置 / 打印机 */
   for (const tr2 of G.turrets) {
     tr2.life -= dt; tr2.cd -= dt;
     if (!tr2.owner.alive) continue;
@@ -1445,6 +1445,20 @@ export function update(dt) {
         }
       }
       tr2.stunCd = (tr2.stunCd || 0) - dt;
+      continue;
+    }
+    if (tr2.kind === 'printer') {
+      /* 打印机：持续射出穿透减速纸张 */
+      if (tr2.cd <= 0) {
+        const t = nearestUnit(tr2.x, tr2.y, 210, o => isFoe(tr2.owner, o));
+        if (t) {
+          tr2.cd = .45;
+          spawnBullet(tr2.owner, Math.atan2(t.y - tr2.y, t.x - tr2.x),
+            { x: tr2.x, y: tr2.y - 3, dmg: tr2.dmg || 8,
+              spd: 300, range: 230, shape: 'dot', color: '#f2efe6', pierce: 2, _echo: true,
+              onHitMark: { slowT: 1.2 } });
+        }
+      }
       continue;
     }
     if (tr2.cd <= 0) {
@@ -3193,7 +3207,8 @@ function openLevelup() {
       if (gear && picked.length) { picked[picked.length - 1] = gear; G.dryDrafts = 0; }
     }
   } else G.dryDrafts = 0;
-  while (picked.length < 3) picked.push({ kind: 'skill', id: '_coffee' + picked.length, name: '茶水间补给', eff: '回复 40 HP',
+  const choiceCount = G.extraCard ? 4 : 3;
+  while (picked.length < choiceCount) picked.push({ kind: 'skill', id: '_coffee' + picked.length, name: '茶水间补给', eff: '回复 40 HP',
     tag: '没什么可学的了，喝口咖啡接着卷。', ref: null, w: 1 });
   /* 10% 概率金色「精修版」（仅普通技能卡） */
   levelChoices = picked.map(c => ({ ...c, rare: c.kind === 'skill' && !!c.ref && Math.random() < .1 }));
@@ -3217,7 +3232,7 @@ export function pickLevelChoice(i) {
   } else if (s.kind === 'active') {
     if (pl.active && pl.active.id === s.id) pl.active.lv++;
     else { pl.active = { id: s.id, lv: 1 }; pl.activeCd = 1; }
-    addFloat(pl.x, pl.y - 22, `主动技能：${ACTIVES[s.id].name}（按 Q）`, '#b665ff', 8, 1.2);
+    addFloat(pl.x, pl.y - 22, `主动技能：${ACTIVES[s.id].name}${IS_TOUCH ? '（点右下技能按钮）' : '（按 Q）'}`, '#b665ff', 8, 1.2);
   } else if (s.ref) {
     applySkill(pl, s.ref);
     if (s.rare && (pl.skills[s.id] || 0) < s.ref.max) {
@@ -3335,6 +3350,7 @@ export function handleKey(code) {
     if (code === 'Digit1') pickLevelChoice(0);
     else if (code === 'Digit2') pickLevelChoice(1);
     else if (code === 'Digit3') pickLevelChoice(2);
+    else if (code === 'Digit4') pickLevelChoice(3);
   } else if (state === 'menu' || state === 'dead' || state === 'win') {
     if (code === 'Enter' && Date.now() - loadedAt > 500) startGame();
   }

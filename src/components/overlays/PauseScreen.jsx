@@ -3,10 +3,16 @@ import { COPY } from '../../game/data/copy.js';
 import { shuffle } from '../../game/utils.js';
 import { startGame, togglePause } from '../../game/core.js';
 import { isMuted, toggleMuted } from '../../game/audio.js';
+import { IS_TOUCH } from '../../game/input.js';
 import * as bridge from '../../game/bridge.js';
 
 export default function PauseScreen() {
-  const tips = useMemo(() => shuffle(COPY.tips).slice(0, 3), []);
+  const tips = useMemo(() => {
+    const pool = IS_TOUCH
+      ? COPY.tips.filter(t => !/WASD|鼠标|Shift|ESC|按 [A-Z]/.test(t))
+      : COPY.tips;
+    return shuffle(pool).slice(0, 3);
+  }, []);
 
   return (
     <div className="overlay">

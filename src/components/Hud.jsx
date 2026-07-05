@@ -167,7 +167,7 @@ export default function Hud() {
 
       <KillFeed />
 
-      {hc && pl.alive && !touch.using && (
+      {hc && pl.alive && !IS_TOUCH && !touch.using && (
         <div id="prompt-e" className={canFuse ? 'fuse' : w.leg ? 'warn' : ''}>
           {canFuse
             ? <><kbd>F</kbd> 融合 →「{LEGENDS[findRecipe(w.id, hc.id)].name}」 · <kbd>E</kbd> 换枪</>
