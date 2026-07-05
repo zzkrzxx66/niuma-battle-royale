@@ -136,6 +136,11 @@ export function purchaseUpgrade(upgrades, gold, itemId) {
   if (gold < cost) return { success: false, error: '金币不足' };
   upgrades[itemId] = lv + 1;
   saveShopUpgrades(upgrades);
+  try {
+    const stats = JSON.parse(localStorage.getItem('niuma_stats') || '{}');
+    stats.shopPurchases = (stats.shopPurchases || 0) + 1;
+    localStorage.setItem('niuma_stats', JSON.stringify(stats));
+  } catch (e) {}
   return { success: true, cost, goldLeft: gold - cost };
 }
 

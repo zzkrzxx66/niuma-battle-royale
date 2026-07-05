@@ -14,6 +14,9 @@ import { ACTIVES } from './data/actives.js';
 import { EVOLUTIONS } from './data/evolutions.js';
 import { COPY } from './data/copy.js';
 import { SHOP_ITEMS, loadShopUpgrades, purchaseUpgrade, computeUpgrades } from './data/shop.js';
+import { ACHIEVEMENTS, loadAchievements, saveAchievements, loadStats, saveStats, addStat, setStatMax } from './data/achievements.js';
+import { discoverDex } from './data/dex.js';
+import { EVENTS } from './data/events.js';
 import { SPR, workerSprite, SHIRT_COLORS } from './sprites.js';
 import { SFX, beep, later, cancelPendingSfx, initAudio } from './audio.js';
 import { BGM } from './bgm.js';
@@ -155,6 +158,7 @@ export const speedOf = u => {
   if (u.curses.overfit > 0) s *= .6;
   if (u.empowerT > 0) s *= 1.15;
   if (u.reviewBoostT > 0) s *= 1.15;   // 需求评审会光环
+  if (G && G.activeEvent && G.activeEvent.id === 'leader_check' && isFoe(G.player, u)) s *= 1.3;
   if (u.oaSlowT > 0) s *= .6;          // OA审批流公文包
   let slow = 1;
   for (const bz of G.burns) if (isFoe(bz.owner, u) && dist2(u.x, u.y, bz.x, bz.y) < bz.r * bz.r) slow = Math.min(slow, 1 - bz.slow);
@@ -168,6 +172,7 @@ function newGame(trialMonths = 0, mode = 'battle') {
     mode,  /* 'battle' | 'endless' */
     endlessWave: 0, endlessWaveT: 30, endlessBurstLeft: 0, endlessMobsAlive: 0,
     goldEarned: 0,
+    eventT: 45, activeEvent: null, activeEventT: 0, eventHistory: [],
     /* 试用期：每月 30 秒一波杂鱼 + 一个月度考核小 Boss；期间同事互相无敌 */
     trial: { months: trialMonths, active: trialMonths > 0, wave: 0, waveT: .01, bossThisWave: true,
       bossOrder: shuffle(['ppt', 'meeting', 'intern', 'attendance']), cdWarned: false },   // 考核池只含无需同事在场的四位
@@ -782,6 +787,9 @@ function killUnit(victim, killer, cause) {
       spawnItem(G, undefined, victim.x + rand(-10, 10), victim.y + rand(-10, 10));
     if (killer.isPlayer) {
       G.kills++; SFX.kill();
+      addStat('kills', 1);
+      if (victim.isMob) discoverDex('mobs', victim.mobType);
+      if (victim.isBoss || victim.isHR) { addStat('bossKills', 1); checkAchievements(); }
       earnGold(1);  /* 每杀一个得 1 金币 */
       G.freezeT = .07;
       if (G.t - (G.lastKillT === undefined ? -9 : G.lastKillT) < 3) G.streak++;
@@ -842,6 +850,7 @@ export function gainXp(u, amt) {
   }
   /* 商城永久经验加成 */
   if (G && G.xpBonus && u.isPlayer) amt *= (1 + G.xpBonus);
+  if (G && G.activeEvent && G.activeEvent.id === 'all_hands' && u.isPlayer) amt *= 1.25;
   u.xp += amt * u.mods.xp;
   while (u.xp >= TUNE.levelNeed(u.level)) {
     u.xp -= TUNE.levelNeed(u.level);
@@ -868,6 +877,7 @@ export function applySkill(u, s) {
 }
 
 function useItem(u, id) {
+  if (u.isPlayer) discoverDex('items', id);
   const boost = u.mods.itemBoost;
   const F = n => Math.round(n * boost);
   switch (id) {
@@ -1340,6 +1350,7 @@ export function update(dt) {
 
   updateZone(dt);
   updateEndless(dt);
+  updateEvents(dt);
 
   /* 濒死心跳 */
   if (G.player.alive && G.player.hp < maxHp(G.player) * .3) {
@@ -1374,7 +1385,7 @@ export function update(dt) {
     }
     G.itemT -= dt;
     if (G.itemT <= 0) {
-      G.itemT = 12;
+      G.itemT = (G.activeEvent && G.activeEvent.id === 'budget_cut') ? 24 : 12;
       if (G.pickups.filter(p => p.type === 'item').length < 12) spawnItem(G);
     }
     G.techT -= dt;
@@ -3008,6 +3019,8 @@ export function playerFuse() {
   p.dead = true;
   pl.weapon.leg = leg;
   pl.weapon.cd = 0;
+  discoverDex('legends', leg);
+  addStat('fusions', 1); checkAchievements();
   addFeed(`你 融合出了传说武器「${LEGENDS[leg].name}」！`, true);
   addFloat(pl.x, pl.y - 22, `「${LEGENDS[leg].name}」`, LEGENDS[leg].color, 10, 1.6);
   addParts(pl.x, pl.y, LEGENDS[leg].color, 34, 140, .9);
@@ -3058,7 +3071,65 @@ function saveEndlessBest(wave) {
 /* 击杀获得金币 */
 function earnGold(amount) {
   if (!G) return;
-  G.goldEarned += amount;
+  let m = 1;
+  if (G.activeEvent && ['budget_cut', 'leader_check'].includes(G.activeEvent.id)) m *= (G.activeEvent.id === 'budget_cut' ? 2 : 1.5);
+  const gain = Math.max(1, Math.round(amount * m));
+  G.goldEarned += gain;
+  G.statsGoldEarned = (G.statsGoldEarned || 0) + gain;
+}
+
+function unlockAchievement(id) {
+  const a = ACHIEVEMENTS.find(x => x.id === id); if (!a) return false;
+  const got = loadAchievements(); if (got[id]) return false;
+  got[id] = Date.now(); saveAchievements(got);
+  saveGold(loadGold() + a.reward);
+  if (G) { G.achievementPop = a; addFloat(G.player.x, G.player.y - 28, `成就：${a.name} +${a.reward}金币`, '#ffcf33', 9, 1.6); }
+  return true;
+}
+
+function checkAchievements() {
+  if (!G) return;
+  const s = loadStats();
+  unlockAchievement('first_game');
+  if ((s.kills || 0) >= 50) unlockAchievement('kill_50');
+  if ((s.kills || 0) >= 300) unlockAchievement('kill_300');
+  if ((s.bossKills || 0) >= 1) unlockAchievement('boss_killer');
+  if ((s.fusions || 0) >= 1) unlockAchievement('fuse_once');
+  if ((s.bestEndless || 0) >= 10) unlockAchievement('endless_10');
+  if ((s.bestEndless || 0) >= 20) unlockAchievement('endless_20');
+  if ((s.goldEarned || 0) >= 500) unlockAchievement('gold_500');
+  if ((s.bestLevel || 0) >= 15) unlockAchievement('level_15');
+  if ((s.shopPurchases || 0) >= 1) unlockAchievement('shop_first');
+}
+
+function triggerRandomEvent() {
+  const ev = pick(EVENTS);
+  G.activeEvent = { ...ev }; G.activeEventT = ev.dur; G.eventHistory.push(ev.id);
+  warn(`办公室事件：${ev.name} — ${ev.desc}`);
+  addFloat(G.player.x, G.player.y - 34, ev.name, '#ff9440', 11, 1.8);
+  if (ev.id === 'tea_supply') {
+    for (let i = 0; i < 8; i++) spawnItem(G, undefined, G.player.x + rand(-180, 180), G.player.y + rand(-120, 120));
+    G.activeEventT = 1;
+  } else if (ev.id === 'server_down') {
+    for (const u of G.units) if (isFoe(G.player, u)) u.stunT = Math.max(u.stunT, 5);
+  } else if (ev.id === 'hr_calibration') {
+    for (let i = 0; i < 3; i++) spawnMob('kpi_hunter', G.player.x + rand(-220, 220), G.player.y + rand(-160, 160), false, 5);
+  }
+  SFX.zone();
+}
+
+function updateEvents(dt) {
+  if (G.trial.active) return;
+  if (G.activeEvent) {
+    G.activeEventT -= dt;
+    if (G.activeEvent.id === 'all_hands') {
+      for (const u of G.units) if (isFoe(G.player, u) && u.alive) { u.bot = u.bot || {}; u.bot.target = G.player; }
+    }
+    if (G.activeEventT <= 0) { warn(`事件结束：${G.activeEvent.name}`); G.activeEvent = null; G.eventT = rand(55, 85); }
+    return;
+  }
+  G.eventT -= dt;
+  if (G.eventT <= 0) triggerRandomEvent();
 }
 
 /* ---------- 无尽模式波次生成 ---------- */
@@ -3112,9 +3183,17 @@ function endChecks(dt) {
         const gold = G.goldEarned;
         saveGold(loadGold() + gold);
         G.totalGold = loadGold();
+        setStatMax('bestEndless', G.endlessWave);
+        addStat('goldEarned', gold);
+        setStatMax('bestLevel', G.player.level);
+        checkAchievements();
       } else {
         G.newBest = saveBest(G.playerRank, G.kills);
         if (G.newBest) SFX.levelup();
+        saveGold(loadGold() + (G.goldEarned || 0));
+        addStat('goldEarned', G.goldEarned || 0);
+        setStatMax('bestLevel', G.player.level);
+        checkAchievements();
       }
       setState('dead');
     }
@@ -3133,6 +3212,10 @@ function endChecks(dt) {
     G.winT -= dt;
     if (G.winT <= 0) {
       G.newBest = saveBest(1, G.kills);
+      saveGold(loadGold() + (G.goldEarned || 0));
+      addStat('goldEarned', G.goldEarned || 0);
+      setStatMax('bestLevel', G.player.level);
+      checkAchievements();
       setState('win');
     }
   }
@@ -3284,7 +3367,8 @@ export function startGame(mode) {
     setState('playing');
     warn('无尽模式：没有缩圈，没有终点，活到最后一波！');
     applyShopUpgrades(upgrades);
-    return;
+  discoverDex('weapons', G.player.weapon.id);
+  return;
   }
   let months = 3;
   try { months = parseInt(localStorage.getItem('niuma_trial') ?? '3', 10); } catch (e) { /* ignore */ }
@@ -3295,6 +3379,7 @@ export function startGame(mode) {
     ? `HR：签到成功。试用期 ${months} 个月，期间同事互不伤害，先把琐事清了。`
     : 'HR：签到成功，欢迎参加本季度大逃杀。');
   applyShopUpgrades(upgrades);
+  discoverDex('weapons', G.player.weapon.id);
 }
 
 /* 应用商城永久升级到当前游戏状态 */

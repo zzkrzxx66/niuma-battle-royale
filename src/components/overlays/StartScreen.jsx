@@ -9,6 +9,8 @@ import { IS_TOUCH } from '../../game/input.js';
 import { startGame, loadBest, loadGold, loadEndlessBest } from '../../game/core.js';
 import { loadShopUpgrades, getUpgradeLevel } from '../../game/data/shop.js';
 import ShopScreen from './ShopScreen.jsx';
+import AchievementScreen from './AchievementScreen.jsx';
+import DexScreen from './DexScreen.jsx';
 import { pick } from '../../game/utils.js';
 import workerNative from '../../assets/worker_native.png';
 
@@ -38,6 +40,8 @@ export default function StartScreen() {
   const endlessBest = useMemo(() => loadEndlessBest(), []);
   const wRows = country => Object.entries(WEAPONS).filter(([, d]) => d.country === country);
   const [shopOpen, setShopOpen] = useState(false);
+  const [achOpen, setAchOpen] = useState(false);
+  const [dexFullOpen, setDexFullOpen] = useState(false);
   const hasChooseWeapon = getUpgradeLevel(loadShopUpgrades(), 'start_weapon') > 0;
   const [chosenWeapon, setChosenWeapon] = useState(() => {
     try { return localStorage.getItem('niuma_chosen_weapon') || ''; } catch (e) { return ''; }
@@ -120,9 +124,13 @@ export default function StartScreen() {
             <button className="btn" onClick={() => startGame('battle')}>大逃杀</button>
             <button className="btn" style={{ background: 'var(--us)', color: '#fff' }} onClick={() => startGame('endless')}>无尽模式</button>
             <button className="btn" style={{ background: 'var(--badge)' }} onClick={() => setShopOpen(true)}>💰 商城</button>
-            <button className="btn ghost" onClick={() => setDexOpen(o => !o)}>图鉴 {dexOpen ? '▴' : '▾'}</button>
+            <button className="btn ghost" onClick={() => setAchOpen(true)}>🏆 成就</button>
+            <button className="btn ghost" onClick={() => setDexFullOpen(true)}>📚 图鉴</button>
+            <button className="btn ghost" onClick={() => setDexOpen(o => !o)}>武器表 {dexOpen ? '▴' : '▾'}</button>
           </div>
           {shopOpen && <ShopScreen onClose={() => setShopOpen(false)} />}
+          {achOpen && <AchievementScreen onClose={() => setAchOpen(false)} />}
+          {dexFullOpen && <DexScreen onClose={() => setDexFullOpen(false)} />}
           {dexOpen && (
             <div id="dex">
               <div className="dex-sec">— 国产队 —</div>

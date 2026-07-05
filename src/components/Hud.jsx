@@ -138,6 +138,7 @@ export default function Hud() {
       <div className="hud-tc">
         <div className="tag">存活牛马 <b>{aliveWorkers() + (G.latentBots ? G.latentBots.length : 0)}</b>/{TUNE.botCount + 1}{G.latentBots ? '（同事未到岗）' : ''}</div>
         <div className="tag" id="next-tag" style={{ marginTop: 4 }}>{nextZone}</div>
+        {G.activeEvent && <div className="tag" style={{ color: '#ff9440', marginTop: 4 }}>事件：{G.activeEvent.name} {Math.ceil(G.activeEventT)}s</div>}
         <ZoneWarn />
       </div>
 

@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { SHOP_ITEMS, loadShopUpgrades, getUpgradeLevel, purchaseUpgrade } from '../../game/data/shop.js';
+import { ACHIEVEMENTS, loadAchievements, saveAchievements } from '../../game/data/achievements.js';
 import { loadGold } from '../../game/core.js';
 
 export default function ShopScreen({ onClose }) {
@@ -14,7 +15,17 @@ export default function ShopScreen({ onClose }) {
     if (result.success) {
       /* 扣金币 */
       try { localStorage.setItem('niuma_gold', String(result.goldLeft)); } catch (e) {}
-      setGold(result.goldLeft);
+      let finalGold = result.goldLeft;
+      try {
+        const got = loadAchievements();
+        if (!got.shop_first) {
+          const ach = ACHIEVEMENTS.find(a => a.id === 'shop_first');
+          got.shop_first = Date.now(); saveAchievements(got);
+          finalGold += ach.reward;
+          localStorage.setItem('niuma_gold', String(finalGold));
+        }
+      } catch (e) {}
+      setGold(finalGold);
       setUpgrades({ ...ups });
       const item = SHOP_ITEMS.find(i => i.id === itemId);
       setMsg(`✅ 购买成功：${item.name} → Lv.${getUpgradeLevel(ups, itemId)}`);
