@@ -1,9 +1,9 @@
-import { WEAPONS, LEGENDS } from './weapons.js';
+import { WEAPONS, MAIN_WEAPONS, LEGENDS } from './weapons.js';
 import { MOBS } from './mobs.js';
 import { CONSUMABLES } from './consumables.js';
 
 export const DEX_SECTIONS = [
-  { id: 'weapons', name: 'AI武器', source: WEAPONS },
+  { id: 'weapons', name: 'AI武器', source: MAIN_WEAPONS },
   { id: 'legends', name: '传说融合', source: LEGENDS },
   { id: 'mobs', name: '怪物', source: MOBS },
   { id: 'items', name: '道具', source: CONSUMABLES },

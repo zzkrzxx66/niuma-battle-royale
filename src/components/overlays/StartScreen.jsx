@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
-import { WEAPONS, LEGENDS, RECIPES } from '../../game/data/weapons.js';
+import { WEAPONS, MAIN_WEAPON_IDS, LEGENDS, RECIPES } from '../../game/data/weapons.js';
 import { TECH, ELITES, DISTILLS } from '../../game/data/tech.js';
 import { SUBS } from '../../game/data/subweapons.js';
 import { ACTIVES } from '../../game/data/actives.js';
@@ -38,7 +38,7 @@ export default function StartScreen() {
   const best = useMemo(() => loadBest(), []);
   const gold = useMemo(() => loadGold(), []);
   const endlessBest = useMemo(() => loadEndlessBest(), []);
-  const wRows = country => Object.entries(WEAPONS).filter(([, d]) => d.country === country);
+  const wRows = country => MAIN_WEAPON_IDS.map(id => [id, WEAPONS[id]]).filter(([, d]) => d.country === country);
   const [shopOpen, setShopOpen] = useState(false);
   const [achOpen, setAchOpen] = useState(false);
   const [dexFullOpen, setDexFullOpen] = useState(false);
@@ -46,7 +46,7 @@ export default function StartScreen() {
   const [chosenWeapon, setChosenWeapon] = useState(() => {
     try { return localStorage.getItem('niuma_chosen_weapon') || ''; } catch (e) { return ''; }
   });
-  const allWeapons = Object.entries(WEAPONS);
+  const allWeapons = MAIN_WEAPON_IDS.map(id => [id, WEAPONS[id]]);
 
   return (
     <div className="overlay">

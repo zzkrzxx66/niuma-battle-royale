@@ -4,7 +4,7 @@
  * ===================================================================== */
 import { TUNE } from './constants.js';
 import { rand, randi, pick, clamp, lerp, dist, dist2, shuffle, distToSeg } from './utils.js';
-import { WEAPONS, LEGENDS, findRecipe, recipePartner, wdef } from './data/weapons.js';
+import { WEAPONS, MAIN_WEAPON_IDS, LEGENDS, findRecipe, recipePartner, wdef } from './data/weapons.js';
 import { SKILLS } from './data/skills.js';
 import { CONSUMABLES } from './data/consumables.js';
 import { TECH, PLAYER_ONLY_TECH, TECH_TIERS, DISTILLS, CURSES, ELITES, ELITE_T1, ELITE_T2 } from './data/tech.js';
@@ -158,7 +158,7 @@ export const speedOf = u => {
   if (u.curses.overfit > 0) s *= .6;
   if (u.empowerT > 0) s *= 1.15;
   if (u.reviewBoostT > 0) s *= 1.15;   // 需求评审会光环
-  if (G && G.activeEvent && G.activeEvent.id === 'leader_check' && isFoe(G.player, u)) s *= 1.3;
+  if (G && G.activeEvent && G.activeEvent.id === 'leader_check' && isFoe(G.player, u)) s *= 1.2;
   if (u.oaSlowT > 0) s *= .6;          // OA审批流公文包
   let slow = 1;
   for (const bz of G.burns) if (isFoe(bz.owner, u) && dist2(u.x, u.y, bz.x, bz.y) < bz.r * bz.r) slow = Math.min(slow, 1 - bz.slow);
@@ -172,7 +172,7 @@ function newGame(trialMonths = 0, mode = 'battle') {
     mode,  /* 'battle' | 'endless' */
     endlessWave: 0, endlessWaveT: 30, endlessBurstLeft: 0, endlessMobsAlive: 0,
     goldEarned: 0,
-    eventT: 45, activeEvent: null, activeEventT: 0, eventHistory: [],
+    eventT: rand(80, 110), activeEvent: null, activeEventT: 0, eventHistory: [],
     /* 试用期：每月 30 秒一波杂鱼 + 一个月度考核小 Boss；期间同事互相无敌 */
     trial: { months: trialMonths, active: trialMonths > 0, wave: 0, waveT: .01, bossThisWave: true,
       bossOrder: shuffle(['ppt', 'meeting', 'intern', 'attendance']), cdWarned: false },   // 考核池只含无需同事在场的四位
@@ -209,7 +209,7 @@ function newGame(trialMonths = 0, mode = 'battle') {
   }
 
   /* 玩家 + 机器人牛马 */
-  const wIds = Object.keys(WEAPONS);
+  const wIds = MAIN_WEAPON_IDS;
   const pa = rand(0, Math.PI * 2);
   const player = makeUnit('你（牛马本马）', W / 2 + Math.cos(pa) * 350, W / 2 + Math.sin(pa) * 350,
     { isPlayer: true, hp: TUNE.playerHp, spd: TUNE.playerSpeed, weaponId: pick(wIds), shirt: '#ffcf33' });
@@ -241,7 +241,7 @@ function newGame(trialMonths = 0, mode = 'battle') {
   }
 
   /* 初始芯片：按武器数量自适应，保证每种至少 ~2 个 */
-  const chipCount = Math.max(26, Object.keys(WEAPONS).length * 2);
+  const chipCount = Math.max(30, MAIN_WEAPON_IDS.length * 2 + 6);
   for (let i = 0; i < chipCount; i++) spawnChip(g, pick(wIds), 1);
   for (let i = 0; i < 16; i++) spawnItem(g);
   for (let i = 0; i < 6; i++) spawnTech(g, pickTechId());
@@ -518,7 +518,7 @@ function updateWeapon(u, dt, wantFire, aimA) {
       break;
     }
     case 'gacha': {
-      const roll = rand(.5, 3), mode = randi(0, 3);
+      const roll = rand(def.minMul ?? .5, 3), mode = randi(0, 3);
       const col = pick(['#ff6a8a', '#ffcf33', '#4ec9a0', '#6aa3ff', '#e86ad0']);
       if (mode === 0) spawnBullet(u, aimA, { dmg: dmg * roll * 1.6, r: 3.5, shape: 'orb', color: col });
       else if (mode === 1) for (let i = -1; i <= 1; i++) spawnBullet(u, aimA + i * .22, { dmg: dmg * roll * .6, shape: 'dot', color: col });
@@ -845,12 +845,12 @@ export function chipObtainable(id) {
 export function gainXp(u, amt) {
   /* 试用期工资打折：多源经验的总闸，防止发育期通胀吃光整个卡池 */
   if (G && G.trial.active && u.isPlayer) {
-    amt *= .42;   // 0.6→0.42，配合底数1.26与新怪物xp/hp值放慢试用期升级节奏，见设计文档第2节
+    amt *= .50;   // v4.1：试用期经验折扣从0.42回调到0.50，前期发育不再过闷
     G.trialXpEarned = (G.trialXpEarned || 0) + amt * u.mods.xp;   // 记账：转正同事按此补发育
   }
   /* 商城永久经验加成 */
   if (G && G.xpBonus && u.isPlayer) amt *= (1 + G.xpBonus);
-  if (G && G.activeEvent && G.activeEvent.id === 'all_hands' && u.isPlayer) amt *= 1.25;
+  if (G && G.activeEvent && G.activeEvent.id === 'all_hands' && u.isPlayer) amt *= 1.2;
   u.xp += amt * u.mods.xp;
   while (u.xp >= TUNE.levelNeed(u.level)) {
     u.xp -= TUNE.levelNeed(u.level);
@@ -1366,19 +1366,19 @@ export function update(dt) {
   if (G.zone.phase < 3) {
     G.chipT -= dt;
     if (G.chipT <= 0) {
-      G.chipT = 10;
-      /* 智能芯片掉落：偏向玩家当前武器（40% 概率），其余随机 */
-      if (G.pickups.filter(p => p.type === 'chip').length < 22) {
+      G.chipT = 12;
+      /* 智能芯片掉落：偏向玩家当前武器（30% 概率），其余从 v4.1 主武器池随机 */
+      if (G.pickups.filter(p => p.type === 'chip').length < 18) {
         const pl = G.player;
         let chipId;
-        if (pl && pl.alive && !pl.weapon.leg && pl.weapon.lvl < 5 && Math.random() < .40) {
+        if (pl && pl.alive && !pl.weapon.leg && pl.weapon.lvl < 5 && Math.random() < .30) {
           chipId = pl.weapon.id;   /* 40% 掉玩家武器的芯片，帮升满级 */
         } else {
-          chipId = pick(Object.keys(WEAPONS));
+          chipId = pick(MAIN_WEAPON_IDS);
         }
         spawnChip(G, chipId, Math.random() < .25 ? 2 : 1);
         /* 额外多掉一个，加速升级节奏 */
-        if (pl && pl.alive && !pl.weapon.leg && pl.weapon.lvl < 5 && Math.random() < .30) {
+        if (pl && pl.alive && !pl.weapon.leg && pl.weapon.lvl < 5 && Math.random() < .20) {
           spawnChip(G, pl.weapon.id, 1);
         }
       }
@@ -2260,7 +2260,7 @@ export function castActive() {
 function spawnLateBots() {
   unlockSubSlot();   // 转正里程碑：解锁副武器第4槽
   if (!G.latentBots) return;
-  const wIds = Object.keys(WEAPONS);
+  const wIds = MAIN_WEAPON_IDS;
   const months = G.trial.months;
   for (const lb of G.latentBots) {
     let bx = TUNE.world / 2, by = TUNE.world / 2;
@@ -3072,7 +3072,7 @@ function saveEndlessBest(wave) {
 function earnGold(amount) {
   if (!G) return;
   let m = 1;
-  if (G.activeEvent && ['budget_cut', 'leader_check'].includes(G.activeEvent.id)) m *= (G.activeEvent.id === 'budget_cut' ? 2 : 1.5);
+  if (G.activeEvent && ['budget_cut', 'leader_check'].includes(G.activeEvent.id)) m *= (G.activeEvent.id === 'budget_cut' ? 1.5 : 1.3);
   const gain = Math.max(1, Math.round(amount * m));
   G.goldEarned += gain;
   G.statsGoldEarned = (G.statsGoldEarned || 0) + gain;
@@ -3108,12 +3108,12 @@ function triggerRandomEvent() {
   warn(`办公室事件：${ev.name} — ${ev.desc}`);
   addFloat(G.player.x, G.player.y - 34, ev.name, '#ff9440', 11, 1.8);
   if (ev.id === 'tea_supply') {
-    for (let i = 0; i < 8; i++) spawnItem(G, undefined, G.player.x + rand(-180, 180), G.player.y + rand(-120, 120));
+    for (let i = 0; i < 5; i++) spawnItem(G, undefined, G.player.x + rand(-180, 180), G.player.y + rand(-120, 120));
     G.activeEventT = 1;
   } else if (ev.id === 'server_down') {
-    for (const u of G.units) if (isFoe(G.player, u)) u.stunT = Math.max(u.stunT, 5);
+    for (const u of G.units) if (isFoe(G.player, u)) u.stunT = Math.max(u.stunT, 3);
   } else if (ev.id === 'hr_calibration') {
-    for (let i = 0; i < 3; i++) spawnMob('kpi_hunter', G.player.x + rand(-220, 220), G.player.y + rand(-160, 160), false, 5);
+    for (let i = 0, n = clamp(1 + Math.floor(G.t / 240), 1, 3); i < n; i++) spawnMob('kpi_hunter', G.player.x + rand(-220, 220), G.player.y + rand(-160, 160), false, 5);
   }
   SFX.zone();
 }
@@ -3125,7 +3125,7 @@ function updateEvents(dt) {
     if (G.activeEvent.id === 'all_hands') {
       for (const u of G.units) if (isFoe(G.player, u) && u.alive) { u.bot = u.bot || {}; u.bot.target = G.player; }
     }
-    if (G.activeEventT <= 0) { warn(`事件结束：${G.activeEvent.name}`); G.activeEvent = null; G.eventT = rand(55, 85); }
+    if (G.activeEventT <= 0) { warn(`事件结束：${G.activeEvent.name}`); G.activeEvent = null; G.eventT = rand(80, 110); }
     return;
   }
   G.eventT -= dt;
@@ -3201,8 +3201,8 @@ function endChecks(dt) {
   }
   if (!G.player.alive) return;
   if (G.mode === 'endless') return;  /* 无尽模式没有胜利条件 */
-  /* Boss 双门槛：战斗时间 300s 或场上只剩 3 个牛马——保证多数对局都能见到老板 */
-  if (!G.bossSpawned && !G.trial.active && (G.t - G.trialOffset >= 300 || aliveWorkers() <= 3)) spawnBoss();
+  /* Boss 双门槛：战斗时间 420s 或场上只剩 3 个牛马——v4.1 拉长普通局节奏 */
+  if (!G.bossSpawned && !G.trial.active && (G.t - G.trialOffset >= 420 || aliveWorkers() <= 3)) spawnBoss();
   if (G.winT === undefined && aliveWorkers() === 1 && G.bossSpawned && G.bossDead) {
     G.winT = 1.2;
     G.winLine = pick(COPY.winLines);
@@ -3407,7 +3407,7 @@ function applyShopUpgrades(up) {
   if (up.chooseWeapon) {
     try {
       const wId = localStorage.getItem('niuma_chosen_weapon');
-      if (wId && WEAPONS[wId]) {
+      if (wId && MAIN_WEAPON_IDS.includes(wId)) {
         G.player.weapon.id = wId;
         G.player.weapon.lvl = 1;
       }
