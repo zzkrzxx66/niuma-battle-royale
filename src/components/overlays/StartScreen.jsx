@@ -11,6 +11,10 @@ import { loadShopUpgrades, getUpgradeLevel } from '../../game/data/shop.js';
 import ShopScreen from './ShopScreen.jsx';
 import AchievementScreen from './AchievementScreen.jsx';
 import DexScreen from './DexScreen.jsx';
+import LeaderboardScreen from './LeaderboardScreen.jsx';
+import CloudSaveScreen from './CloudSaveScreen.jsx';
+import DailyChallengeScreen from './DailyChallengeScreen.jsx';
+import { useOnlineState } from '../../online/useOnlineState.js';
 import { pick } from '../../game/utils.js';
 import workerNative from '../../assets/worker_native.png';
 
@@ -42,6 +46,10 @@ export default function StartScreen() {
   const [shopOpen, setShopOpen] = useState(false);
   const [achOpen, setAchOpen] = useState(false);
   const [dexFullOpen, setDexFullOpen] = useState(false);
+  const [leaderOpen, setLeaderOpen] = useState(false);
+  const [cloudOpen, setCloudOpen] = useState(false);
+  const [dailyOpen, setDailyOpen] = useState(false);
+  const online = useOnlineState();
   const hasChooseWeapon = getUpgradeLevel(loadShopUpgrades(), 'start_weapon') > 0;
   const [chosenWeapon, setChosenWeapon] = useState(() => {
     try { return localStorage.getItem('niuma_chosen_weapon') || ''; } catch (e) { return ''; }
@@ -88,6 +96,10 @@ export default function StartScreen() {
               💰 金币余额：<b>{gold}</b>
             </div>
           )}
+          <div className="tip-line" style={{ color: online.online ? '#2d9b63' : '#8a8271' }}>
+            🌐 联机：{online.online ? `已连接 · ${online.profile?.nickname || '匿名牛马'}` : (online.configured ? '连接中/离线' : '本地模式')}
+            {online.dailyChallenge?.title ? ` · 今日：${online.dailyChallenge.title}` : ''}
+          </div>
           <div className="trial-row">
             <span className="trial-label">试用期（每月一波琐事 + 月度考核 Boss，期间同事互不伤害）：</span>
             {[0, 1, 2, 3, 4, 5, 6].map(m => (
@@ -122,15 +134,21 @@ export default function StartScreen() {
           )}
           <div className="btn-row">
             <button className="btn" onClick={() => startGame('battle')}>大逃杀</button>
+            <button className="btn" style={{ background: '#2d9b63', color: '#fff' }} onClick={() => setDailyOpen(true)}>📅 每日挑战</button>
             <button className="btn" style={{ background: 'var(--us)', color: '#fff' }} onClick={() => startGame('endless')}>无尽模式</button>
             <button className="btn" style={{ background: 'var(--badge)' }} onClick={() => setShopOpen(true)}>💰 商城</button>
             <button className="btn ghost" onClick={() => setAchOpen(true)}>🏆 成就</button>
             <button className="btn ghost" onClick={() => setDexFullOpen(true)}>📚 图鉴</button>
+            <button className="btn ghost" onClick={() => setLeaderOpen(true)}>🏅 排行榜</button>
+            <button className="btn ghost" onClick={() => setCloudOpen(true)}>☁️ 云存档</button>
             <button className="btn ghost" onClick={() => setDexOpen(o => !o)}>武器表 {dexOpen ? '▴' : '▾'}</button>
           </div>
           {shopOpen && <ShopScreen onClose={() => setShopOpen(false)} />}
           {achOpen && <AchievementScreen onClose={() => setAchOpen(false)} />}
           {dexFullOpen && <DexScreen onClose={() => setDexFullOpen(false)} />}
+          {leaderOpen && <LeaderboardScreen onClose={() => setLeaderOpen(false)} />}
+          {cloudOpen && <CloudSaveScreen onClose={() => setCloudOpen(false)} />}
+          {dailyOpen && <DailyChallengeScreen onClose={() => setDailyOpen(false)} onLeaderboard={() => { setDailyOpen(false); setLeaderOpen(true); }} />}
           {dexOpen && (
             <div id="dex">
               <div className="dex-sec">— 国产队 —</div>

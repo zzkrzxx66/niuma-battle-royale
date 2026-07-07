@@ -73,6 +73,12 @@ export default function EndScreen({ win }) {
             </div>
           )}
           <div className="quote">{quote}</div>
+          {G.onlineScore && (
+            <div className="quote" style={{ borderLeftColor: G.onlineScore.ok ? '#2d9b63' : '#ff9440' }}>
+              联机成绩：{G.onlineScore.ok ? '已上传' : (G.onlineScore.queued ? '已加入待上传队列' : '离线未上传')} · 分数 {G.onlineScore.score || 0}
+              {G.onlineScore.suspicious ? ' · 标记复核' : ''}
+            </div>
+          )}
           {G.newBest && !isEndless && <div className="stamp newbest">新纪录<br />NEW</div>}
           {G.newEndlessBest && isEndless && <div className="stamp newbest">新纪录<br />NEW</div>}
           {win && <div className="art-boss" style={{ backgroundImage: `url(${bossNative})` }} />}

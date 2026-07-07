@@ -22,6 +22,8 @@ import { SFX, beep, later, cancelPendingSfx, initAudio } from './audio.js';
 import { BGM } from './bgm.js';
 import { keys, mouse, touch, handlers, IS_TOUCH } from './input.js';
 import * as bridge from './bridge.js';
+import { submitScore, uploadCloudSave } from '../online/service.js';
+import { touchLocalSave } from '../online/localSave.js';
 
 /* ---------- 对外状态 ---------- */
 export let G = null;
@@ -3173,6 +3175,30 @@ function updateEndless(dt) {
   }
 }
 
+
+function submitRunResult(outcome) {
+  if (!G || !G.player) return;
+  const pl = G.player;
+  const run = {
+    mode: G.mode === 'daily' ? 'daily' : (G.mode === 'endless' ? 'endless' : 'classic'),
+    challengeDate: G.dailyChallenge?.challenge_date || null,
+    surviveTime: Math.round(G.t || 0),
+    kills: G.kills || 0,
+    level: pl.level || 1,
+    bossKilled: !!G.bossDead || outcome === 'win',
+    bossKillTime: G.bossDeadAt ? Math.round(G.bossDeadAt) : null,
+    goldEarned: G.goldEarned || 0,
+    weaponIds: [pl.weapon.id].filter(Boolean),
+    legendaryIds: pl.weapon.leg ? [pl.weapon.leg] : [],
+    endlessWave: G.endlessWave || 0,
+    difficulty: G.mode === 'daily' ? 'daily' : 'normal',
+    runHash: `${G.mode || 'classic'}-${Math.round(G.t || 0)}-${G.kills || 0}-${pl.level || 1}-${pl.weapon.id || ''}-${pl.weapon.leg || ''}`,
+  };
+  touchLocalSave();
+  submitScore(run).then(r => { G.onlineScore = r; bridge.notify(); }).catch(() => {});
+  uploadCloudSave().catch(() => {});
+}
+
 /* ---------- 终局判定 ---------- */
 function endChecks(dt) {
   if (G.endT > 0) {
@@ -3187,6 +3213,7 @@ function endChecks(dt) {
         addStat('goldEarned', gold);
         setStatMax('bestLevel', G.player.level);
         checkAchievements();
+        submitRunResult('dead');
       } else {
         G.newBest = saveBest(G.playerRank, G.kills);
         if (G.newBest) SFX.levelup();
@@ -3194,6 +3221,7 @@ function endChecks(dt) {
         addStat('goldEarned', G.goldEarned || 0);
         setStatMax('bestLevel', G.player.level);
         checkAchievements();
+        submitRunResult('dead');
       }
       setState('dead');
     }
@@ -3216,6 +3244,7 @@ function endChecks(dt) {
       addStat('goldEarned', G.goldEarned || 0);
       setStatMax('bestLevel', G.player.level);
       checkAchievements();
+      submitRunResult('win');
       setState('win');
     }
   }
@@ -3367,8 +3396,25 @@ export function startGame(mode) {
     setState('playing');
     warn('无尽模式：没有缩圈，没有终点，活到最后一波！');
     applyShopUpgrades(upgrades);
-  discoverDex('weapons', G.player.weapon.id);
-  return;
+    discoverDex('weapons', G.player.weapon.id);
+    return;
+  }
+  if (gm === 'daily') {
+    let dc = null;
+    try { dc = JSON.parse(localStorage.getItem('niuma_daily_challenge') || 'null'); } catch (e) { dc = null; }
+    G = newGame(0, 'daily');
+    G.dailyChallenge = dc;
+    G.trial.active = false; G.trialOffset = 0;
+    const pool = dc?.rules?.weaponPool;
+    if (Array.isArray(pool) && pool.length) {
+      const legal = pool.filter(id => MAIN_WEAPON_IDS.includes(id));
+      if (legal.length) { G.player.weapon.id = pick(legal); G.player.weapon.lvl = 1; }
+    }
+    setState('playing');
+    warn(`每日挑战：${dc?.title || '今日挑战'}。规则固定，结算上传今日榜。`);
+    applyShopUpgrades(upgrades);
+    discoverDex('weapons', G.player.weapon.id);
+    return;
   }
   let months = 3;
   try { months = parseInt(localStorage.getItem('niuma_trial') ?? '3', 10); } catch (e) { /* ignore */ }

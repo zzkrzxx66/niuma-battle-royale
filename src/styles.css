@@ -366,3 +366,10 @@ canvas#cv {
   .rank-big small { font-size: 12px; }
   .quote { font-size: 10px; padding: 2px 0 2px 8px; margin-top: 6px; line-height: 1.4; }
 }
+
+/* v4.2 轻联机弹窗 */
+.modal-back{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:80;display:flex;align-items:center;justify-content:center;padding:12px;}
+.modal{position:relative;max-height:86vh;overflow:auto;}
+.small-modal{width:min(720px,94vw);}
+.close{position:absolute;right:10px;top:8px;border:2px solid #000;background:#fff;color:#000;font-weight:900;font-size:18px;line-height:1;cursor:pointer;}
+.modal input{background:#fff;color:var(--ink);}
