@@ -67,6 +67,22 @@ create index if not exists idx_scores_mode_score on public.leaderboard_scores(mo
 create index if not exists idx_scores_daily on public.leaderboard_scores(mode, challenge_date, score desc) where suspicious = false;
 create index if not exists idx_scores_player on public.leaderboard_scores(player_id, created_at desc);
 
+-- 可选：补一条到 profiles 的外键，方便以后用 PostgREST embed 查昵称
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'leaderboard_scores_player_id_profiles_fkey'
+  ) then
+    alter table public.leaderboard_scores
+      add constraint leaderboard_scores_player_id_profiles_fkey
+      foreign key (player_id) references public.profiles(id) on delete cascade;
+  end if;
+exception when others then
+  -- 已有数据不一致时跳过，客户端已改为不依赖该关系
+  null;
+end $$;
+
 alter table public.profiles enable row level security;
 alter table public.cloud_saves enable row level security;
 alter table public.leaderboard_scores enable row level security;

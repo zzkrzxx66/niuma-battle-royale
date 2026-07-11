@@ -39,6 +39,12 @@ function friendlyError(err) {
       ],
     };
   }
+  if (lower.includes('could not find a relationship') || lower.includes('relationship between')) {
+    return {
+      message: '排行榜关联查询失败，请更新到最新版客户端',
+      hints: ['安装最新 APK 后重开排行榜', '旧版依赖表关系嵌入，新版已改为分步查询'],
+    };
+  }
   if (lower.includes('failed to fetch') || lower.includes('network') || lower.includes('load failed')) {
     return {
       message: '网络连接失败，暂时使用本地模式',
@@ -157,12 +163,37 @@ export async function fetchDailyChallenge(date = todayKey()) {
 export async function getLeaderboard(mode = 'classic', challengeDate = null, limit = 50) {
   if (!ONLINE_ENABLED) return { items: [], offline: true };
   try {
-    let q = supabase.from('leaderboard_scores').select('*, profiles(nickname, avatar_key, title)').eq('mode', mode).eq('suspicious', false).order('score', { ascending: false }).limit(limit);
+    // 不依赖 PostgREST 表关系嵌入：先取成绩，再按 player_id 批量补昵称
+    let q = supabase
+      .from('leaderboard_scores')
+      .select('id, player_id, mode, challenge_date, score, survive_time, kills, level, boss_killed, created_at')
+      .eq('mode', mode)
+      .eq('suspicious', false)
+      .order('score', { ascending: false })
+      .limit(limit);
     if (challengeDate) q = q.eq('challenge_date', challengeDate);
     else q = q.is('challenge_date', null);
     const { data, error } = await q;
     if (error) throw error;
-    return { items: (data || []).map((x, i) => ({ rank: i + 1, ...x })), offline: false };
+    const rows = data || [];
+    const ids = [...new Set(rows.map(x => x.player_id).filter(Boolean))];
+    let profileMap = {};
+    if (ids.length) {
+      const { data: profiles, error: pErr } = await supabase
+        .from('profiles')
+        .select('id, nickname, avatar_key, title')
+        .in('id', ids);
+      if (pErr) throw pErr;
+      profileMap = Object.fromEntries((profiles || []).map(p => [p.id, p]));
+    }
+    return {
+      items: rows.map((x, i) => ({
+        rank: i + 1,
+        ...x,
+        profiles: profileMap[x.player_id] || { nickname: '匿名牛马' },
+      })),
+      offline: false,
+    };
   } catch (e) {
     const f = friendlyError(e);
     setState({ lastError: f.message, setupHints: f.hints });
