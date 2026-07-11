@@ -31,6 +31,14 @@ export function attachInput(canvas, stageEl) {
   attached = true;
 
   addEventListener('keydown', e => {
+    const t = e.target;
+    const typing = t && (
+      t.tagName === 'INPUT' ||
+      t.tagName === 'TEXTAREA' ||
+      t.isContentEditable ||
+      (typeof t.closest === 'function' && t.closest('input, textarea, [contenteditable="true"]'))
+    );
+    if (typing) return; // 昵称等输入框里不要拦截按键
     if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
     if (e.repeat) return;
     keys.add(e.code);
