@@ -9,16 +9,64 @@ let onlineState = {
   cloudSave: null,
   dailyChallenge: defaultDailyChallenge(),
   lastError: ONLINE_ENABLED ? '' : '未配置 Supabase，当前为本地离线模式',
+  setupHints: ONLINE_ENABLED ? [] : ['填写 VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY 后重新构建'],
 };
 const listeners = new Set();
 const emit = () => listeners.forEach(fn => fn(onlineState));
 const setState = patch => { onlineState = { ...onlineState, ...patch }; emit(); };
 
+function friendlyError(err) {
+  const msg = String(err?.message || err || '');
+  const code = String(err?.code || err?.error_code || '');
+  const lower = msg.toLowerCase();
+  if (code === 'anonymous_provider_disabled' || lower.includes('anonymous sign-ins are disabled') || lower.includes('anonymous_provider_disabled')) {
+    return {
+      message: '匿名登录未开启：请到 Supabase → Authentication → Providers → Anonymous 打开',
+      hints: [
+        '打开 Supabase 项目后台',
+        'Authentication → Providers → Anonymous → Enable',
+        '保存后回到游戏点“重新连接”',
+      ],
+    };
+  }
+  if (code === 'PGRST205' || lower.includes('could not find the table') || lower.includes('schema cache')) {
+    return {
+      message: '数据表未创建：请在 SQL Editor 执行 supabase-light-online.sql',
+      hints: [
+        '打开 Supabase → SQL Editor',
+        '粘贴并运行 supabase-light-online.sql',
+        '确认 profiles / cloud_saves / leaderboard_scores / daily_challenges 已创建',
+      ],
+    };
+  }
+  if (lower.includes('failed to fetch') || lower.includes('network') || lower.includes('load failed')) {
+    return {
+      message: '网络连接失败，暂时使用本地模式',
+      hints: ['检查手机网络', '确认 Supabase 项目未暂停', '稍后点“重新连接”'],
+    };
+  }
+  if (lower.includes('jwt') || lower.includes('invalid api key') || lower.includes('apikey')) {
+    return {
+      message: 'Supabase Key 无效，请检查 VITE_SUPABASE_ANON_KEY',
+      hints: ['到 Project Settings → API 复制 anon public key', '更新 .env.local 与 GitHub Secrets 后重新构建'],
+    };
+  }
+  return { message: msg || '未知联机错误', hints: [] };
+}
+
 export function subscribeOnline(fn) { listeners.add(fn); return () => listeners.delete(fn); }
 export function getOnlineState() { return onlineState; }
 
 export async function initOnline() {
-  if (!ONLINE_ENABLED) { setState({ ready: true }); return onlineState; }
+  if (!ONLINE_ENABLED) {
+    setState({
+      ready: true,
+      online: false,
+      lastError: '未配置 Supabase，当前为本地离线模式',
+      setupHints: ['填写 VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY 后重新构建'],
+    });
+    return onlineState;
+  }
   try {
     let { data: { session } } = await supabase.auth.getSession();
     if (!session) {
@@ -40,18 +88,20 @@ export async function initOnline() {
     } else {
       await uploadCloudSave();
     }
-    setState({ ready: true, online: true, profile, cloudSave, dailyChallenge, lastError: '' });
+    setState({ ready: true, online: true, profile, cloudSave, dailyChallenge, lastError: '', setupHints: [] });
     await flushPendingScores();
     return onlineState;
   } catch (e) {
-    setState({ ready: true, online: false, lastError: e.message || String(e) });
+    const f = friendlyError(e);
+    setState({ ready: true, online: false, lastError: f.message, setupHints: f.hints });
     return onlineState;
   }
 }
 
 async function ensureProfile(userId) {
   const nickname = localStorage.getItem('niuma_nickname') || `匿名牛马${userId.slice(0, 4)}`;
-  await supabase.from('profiles').upsert({ id: userId, nickname, updated_at: new Date().toISOString() }, { onConflict: 'id' });
+  const { error } = await supabase.from('profiles').upsert({ id: userId, nickname, updated_at: new Date().toISOString() }, { onConflict: 'id' });
+  if (error) throw error;
 }
 async function fetchProfile(userId) {
   const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
@@ -73,11 +123,12 @@ export async function uploadCloudSave() {
     const row = { player_id: user.id, save_version: 1, data: bundle, client_updated_at: new Date().toISOString(), server_updated_at: new Date().toISOString() };
     const { error } = await supabase.from('cloud_saves').upsert(row, { onConflict: 'player_id' });
     if (error) throw error;
-    setState({ cloudSave: row, online: true, lastError: '' });
+    setState({ cloudSave: row, online: true, lastError: '', setupHints: [] });
     return { ok: true };
   } catch (e) {
-    setState({ online: false, lastError: e.message || String(e) });
-    return { ok: false, error: e };
+    const f = friendlyError(e);
+    setState({ online: false, lastError: f.message, setupHints: f.hints });
+    return { ok: false, error: e, message: f.message };
   }
 }
 export async function updateNickname(nickname) {
@@ -89,9 +140,13 @@ export async function updateNickname(nickname) {
     if (!user) throw new Error('未登录');
     const { data, error } = await supabase.from('profiles').update({ nickname: safe, updated_at: new Date().toISOString() }).eq('id', user.id).select('*').single();
     if (error) throw error;
-    setState({ profile: data, online: true, lastError: '' });
+    setState({ profile: data, online: true, lastError: '', setupHints: [] });
     return { ok: true, profile: data };
-  } catch (e) { setState({ lastError: e.message || String(e) }); return { ok: false, error: e }; }
+  } catch (e) {
+    const f = friendlyError(e);
+    setState({ lastError: f.message, setupHints: f.hints });
+    return { ok: false, error: e, message: f.message };
+  }
 }
 export async function fetchDailyChallenge(date = todayKey()) {
   if (!ONLINE_ENABLED) return defaultDailyChallenge(date);
@@ -108,7 +163,11 @@ export async function getLeaderboard(mode = 'classic', challengeDate = null, lim
     const { data, error } = await q;
     if (error) throw error;
     return { items: (data || []).map((x, i) => ({ rank: i + 1, ...x })), offline: false };
-  } catch (e) { setState({ lastError: e.message || String(e) }); return { items: [], error: e }; }
+  } catch (e) {
+    const f = friendlyError(e);
+    setState({ lastError: f.message, setupHints: f.hints });
+    return { items: [], error: e, message: f.message };
+  }
 }
 export function calcScore(run) {
   const boss = run.bossKilled ? 3000 : 0;
@@ -141,7 +200,12 @@ export async function submitScore(run) {
     if (error) throw error;
     await uploadCloudSave();
     return { ok: true, score: payload.score, suspicious: payload.suspicious };
-  } catch (e) { queuePendingScore(payload); setState({ online: false, lastError: e.message || String(e) }); return { ok: false, queued: true, error: e, score: payload.score }; }
+  } catch (e) {
+    const f = friendlyError(e);
+    queuePendingScore(payload);
+    setState({ online: false, lastError: f.message, setupHints: f.hints });
+    return { ok: false, queued: true, error: e, score: payload.score, message: f.message };
+  }
 }
 export async function flushPendingScores() {
   if (!ONLINE_ENABLED) return;
