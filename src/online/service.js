@@ -126,11 +126,38 @@ export async function uploadCloudSave() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('未登录');
     const bundle = loadLocalSaveBundle();
-    const row = { player_id: user.id, save_version: 1, data: bundle, client_updated_at: new Date().toISOString(), server_updated_at: new Date().toISOString() };
-    const { error } = await supabase.from('cloud_saves').upsert(row, { onConflict: 'player_id' });
+    const row = {
+      player_id: user.id,
+      save_version: 1,
+      data: bundle,
+      client_updated_at: new Date().toISOString(),
+      server_updated_at: new Date().toISOString(),
+    };
+    const { data, error } = await supabase.from('cloud_saves').upsert(row, { onConflict: 'player_id' }).select('*').maybeSingle();
     if (error) throw error;
-    setState({ cloudSave: row, online: true, lastError: '', setupHints: [] });
-    return { ok: true };
+    const saved = data || row;
+    setState({ cloudSave: saved, online: true, lastError: '', setupHints: [] });
+    return { ok: true, cloudSave: saved };
+  } catch (e) {
+    const f = friendlyError(e);
+    setState({ online: false, lastError: f.message, setupHints: f.hints });
+    return { ok: false, error: e, message: f.message };
+  }
+}
+
+/** 强制从云端下载存档并覆盖本地（用户手动操作） */
+export async function downloadCloudSave() {
+  if (!ONLINE_ENABLED) return { ok: false, offline: true, message: '未配置 Supabase' };
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('未登录');
+    const cloud = await fetchCloudSave(user.id);
+    if (!cloud?.data) {
+      return { ok: false, message: '云端还没有存档，请先点“上传到云端”' };
+    }
+    applyLocalSaveBundle(cloud.data);
+    setState({ cloudSave: cloud, online: true, lastError: '', setupHints: [] });
+    return { ok: true, cloudSave: cloud };
   } catch (e) {
     const f = friendlyError(e);
     setState({ online: false, lastError: f.message, setupHints: f.hints });

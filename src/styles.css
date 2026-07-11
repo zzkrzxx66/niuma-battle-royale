@@ -386,15 +386,33 @@ canvas#cv {
   flex:1 1 160px;
   min-width:140px;
   max-width:100%;
-  font-size:14px !important;
-  line-height:1.3;
-  padding:8px 10px !important;
+  min-height:40px;
+  font-size:16px !important; /* 16px 可减少部分安卓缩放导致的输入框异常 */
+  line-height:1.4 !important;
+  padding:10px 12px !important;
   border:2px solid #000 !important;
   border-radius:0;
-  background:#fff !important;
-  color:#14161d !important;
-  font-family:var(--mono);
+  background:#ffffff !important;
+  color:#000000 !important;
+  -webkit-text-fill-color:#000000 !important;
+  opacity:1 !important;
+  font-family:var(--sans) !important;
+  font-weight:700 !important;
   outline:none;
-  caret-color:#14161d;
+  caret-color:#000000 !important;
+  text-shadow:none !important;
+  letter-spacing:0 !important;
+  transform:none !important;
+  filter:none !important;
+  mix-blend-mode:normal !important;
+  z-index:2;
+  position:relative;
+}
+.nick-input::placeholder{
+  color:#8a8271 !important;
+  -webkit-text-fill-color:#8a8271 !important;
+  opacity:1 !important;
+  font-weight:500 !important;
 }
 .nick-input:focus{box-shadow:0 0 0 3px rgba(255,207,51,.55);}
+.modal.paper .nick-input{color:#000 !important;-webkit-text-fill-color:#000 !important;}
