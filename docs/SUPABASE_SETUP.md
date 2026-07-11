@@ -3,7 +3,7 @@
 项目已配置到：
 
 ```text
-https://xgxofpdmyzzrmdoxcjjk.supabase.co
+https://lqqqmcypsqkrqqfqnkur.supabase.co
 ```
 
 GitHub Secrets 也已写入：
@@ -13,7 +13,7 @@ VITE_SUPABASE_URL
 VITE_SUPABASE_ANON_KEY
 ```
 
-当前还差 **2 个后台开关/脚本**，做完后就能真正联机。
+密钥已验证可用。当前还差 **2 个后台开关/脚本**，做完后就能真正联机。
 
 ---
 
