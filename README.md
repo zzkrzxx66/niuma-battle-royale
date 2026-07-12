@@ -3,6 +3,8 @@
 像素风肉鸽大逃杀：牛马用中美各家 AI 当武器，升级、融合、跑毒，活到最后再上班。
 桌面（键鼠）与移动端（虚拟摇杆 + 自动瞄准）均可游玩。
 
+完整项目评审、Concept、GDD、TDD、Art Bible、LDD 与数值表见 [`docs/`](docs/README.md)。
+
 ## 运行
 
 ```bash
@@ -21,7 +23,7 @@ src/
 ├── game/                  # 引擎（框架无关）
 │   ├── constants.js       # 视口、平衡数值（TUNE：血量/缩圈/Boss 时间轴）
 │   ├── data/              # ★ 内容数据表——扩展游戏主要改这里
-│   │   ├── weapons.js     #   12 武器 + 6 传说 + 融合配方
+│   │   ├── weapons.js     #   12 把 live 主武器 + 扩展定义 + 8 条可用融合配方
 │   │   ├── skills.js      #   升级三选一职场技能
 │   │   ├── tech.js        #   技术模组 / 诅咒 / 精英野怪
 │   │   ├── consumables.js #   地面消耗品
